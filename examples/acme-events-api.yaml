@@ -1,0 +1,245 @@
+openapi: "3.0.3"
+info:
+  title: Acme Events API
+  version: "2.1.0"
+  description: Manages events, staff assignments, and bookings for the Acme venue platform.
+
+servers:
+  - url: https://api.acme.com/v2
+    description: Production
+  - url: https://api-staging.acme.com/v2
+    description: Staging
+
+paths:
+  /events:
+    get:
+      summary: List events
+      operationId: listEvents
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: venue_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Event"
+                  total:
+                    type: integer
+                  offset:
+                    type: integer
+                  limit:
+                    type: integer
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /events/{id}:
+    get:
+      summary: Get event
+      operationId: getEvent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /events/{id}/staff:
+    get:
+      summary: List staff for event
+      operationId: listEventStaff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Staff list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  staff:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StaffMember"
+
+  /bookings:
+    post:
+      summary: Create booking
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, staff_id]
+              properties:
+                event_id:
+                  type: string
+                staff_id:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        venue_id:
+          type: string
+        venue_name:
+          type: string
+        venue_address:
+          type: string
+        venue_latitude:
+          type: number
+        venue_longitude:
+          type: number
+        capacity:
+          type: integer
+        staff_count:
+          type: integer
+        booking_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        internal_notes:
+          type: string
+        billing_code:
+          type: string
+        account_manager_email:
+          type: string
+        account_manager_phone:
+          type: string
+
+    StaffMember:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+        hourly_rate:
+          type: number
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        event_id:
+          type: string
+        staff_id:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+security:
+  - bearerAuth: []
