@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Generated eval outputs (run artifacts, not source)
+evals/report/outputs/
+
+# macOS
+.DS_Store
