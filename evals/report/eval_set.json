@@ -1,0 +1,180 @@
+[
+  {
+    "id": "r01",
+    "fixture": "../../examples/acme-events-api.yaml",
+    "context": {
+      "rtm_needed": false,
+      "offline_needed": true,
+      "localisation_needed": false,
+      "usage_pattern": "every_screen"
+    },
+    "description": "Acme Events API — known flaws: offset pagination, missing idempotency, PII in schema, no cache headers, inconsistent error schema",
+    "expectations": [
+      {
+        "id": "r01-e01",
+        "category": "scoring",
+        "assertion": "Flags offset pagination as a negative finding — offset+limit params on /events, no cursor param",
+        "evidence_location": "Section 4 (Performance) — pagination row",
+        "must_reference": ["offset", "limit"],
+        "must_not_be": "good"
+      },
+      {
+        "id": "r01-e02",
+        "category": "scoring",
+        "assertion": "Flags POST /bookings as missing idempotency mechanism",
+        "evidence_location": "Section 8 (Error handling) — idempotency row OR Section 15 (Known issues)",
+        "must_reference": ["/bookings", "idempotency"],
+        "must_not_be": "good"
+      },
+      {
+        "id": "r01-e03",
+        "category": "scoring",
+        "assertion": "Flags PII exposure risk — StaffMember schema contains email, phone, hourly_rate; Event schema contains account_manager_email, account_manager_phone",
+        "evidence_location": "Section 10 (Security) — PII row",
+        "must_reference": ["email", "phone"],
+        "must_not_be": "good"
+      },
+      {
+        "id": "r01-e04",
+        "category": "scoring",
+        "assertion": "Scores auth as positive — JWT Bearer is defined in securitySchemes",
+        "evidence_location": "Section 10 (Security) — auth method row",
+        "must_reference": ["JWT", "Bearer"],
+        "must_be": "good"
+      },
+      {
+        "id": "r01-e05",
+        "category": "scoring",
+        "assertion": "Flags absence of Cache-Control headers — not defined anywhere in the spec",
+        "evidence_location": "Section 5 (Caching)",
+        "must_reference": ["Cache-Control"],
+        "must_not_be": "good"
+      },
+      {
+        "id": "r01-e06",
+        "category": "scoring",
+        "assertion": "Flags inconsistent error schema — /events uses Error schema but /events/:id and /bookings use ad-hoc schemas",
+        "evidence_location": "Section 8 (Error handling) — error schema row",
+        "must_not_be": "good"
+      },
+      {
+        "id": "r01-e07",
+        "category": "na_handling",
+        "assertion": "Marks RTM section as N/A — user confirmed not needed",
+        "evidence_location": "Section 7 (RTM)",
+        "must_reference": ["not required"]
+      },
+      {
+        "id": "r01-e08",
+        "category": "na_handling",
+        "assertion": "Marks localisation section as N/A — user confirmed not needed",
+        "evidence_location": "Section 11 (Localisation)"
+      },
+      {
+        "id": "r01-e09",
+        "category": "scoring",
+        "assertion": "Notes staging environment found — servers array includes api-staging.acme.com",
+        "evidence_location": "Section 13 (Testing)",
+        "must_reference": ["staging"],
+        "must_be": "good"
+      },
+      {
+        "id": "r01-e10",
+        "category": "no_fabrication",
+        "assertion": "Does NOT claim rate limit headers are present — none are defined in the spec",
+        "evidence_location": "Section 9 (Rate limiting)",
+        "must_not_fabricate": "X-RateLimit headers present"
+      },
+      {
+        "id": "r01-e11",
+        "category": "no_fabrication",
+        "assertion": "Does NOT claim ETag or Cache-Control headers are present — none are defined in the spec",
+        "evidence_location": "Section 5 (Caching)",
+        "must_not_fabricate": "ETag or Cache-Control present"
+      },
+      {
+        "id": "r01-e12",
+        "category": "score_range",
+        "assertion": "Final adjusted score is between 25 and 60 out of 100 — this spec has significant gaps",
+        "min_score": 25,
+        "max_score": 60
+      },
+      {
+        "id": "r01-e13",
+        "category": "verdict",
+        "assertion": "Verdict is 'Ready with changes' or 'Not mobile-ready' — not 'Mobile-ready'",
+        "must_not_be_verdict": "Mobile-ready"
+      },
+      {
+        "id": "r01-e14",
+        "category": "completeness",
+        "assertion": "Report contains all 17 sections — none omitted",
+        "required_sections": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+      }
+    ]
+  },
+  {
+    "id": "r02",
+    "fixture": "fixtures/well-formed-api.yaml",
+    "context": {
+      "rtm_needed": true,
+      "offline_needed": false,
+      "localisation_needed": false,
+      "usage_pattern": "on_user_action"
+    },
+    "description": "Well-formed API — cursor pagination, idempotency key, cache headers, consistent errors, token auth, rate limiting. Should score high.",
+    "expectations": [
+      {
+        "id": "r02-e01",
+        "category": "scoring",
+        "assertion": "Scores cursor pagination positively",
+        "evidence_location": "Section 4 (Performance)",
+        "must_reference": ["cursor", "after_cursor"],
+        "must_be": "good"
+      },
+      {
+        "id": "r02-e02",
+        "category": "scoring",
+        "assertion": "Scores idempotency key support positively",
+        "evidence_location": "Section 8 (Error handling)",
+        "must_reference": ["Idempotency-Key"],
+        "must_be": "good"
+      },
+      {
+        "id": "r02-e03",
+        "category": "scoring",
+        "assertion": "Scores cache headers positively — Cache-Control and ETag defined",
+        "evidence_location": "Section 5 (Caching)",
+        "must_reference": ["Cache-Control", "ETag"],
+        "must_be": "good"
+      },
+      {
+        "id": "r02-e04",
+        "category": "scoring",
+        "assertion": "Scores rate limiting positively — X-RateLimit-* headers defined",
+        "evidence_location": "Section 9 (Rate limiting)",
+        "must_reference": ["X-RateLimit"],
+        "must_be": "good"
+      },
+      {
+        "id": "r02-e05",
+        "category": "na_handling",
+        "assertion": "Marks offline section as N/A — user confirmed not needed",
+        "evidence_location": "Section 6 (Offline sync)"
+      },
+      {
+        "id": "r02-e06",
+        "category": "score_range",
+        "assertion": "Final adjusted score is between 75 and 100 — this is a well-formed API",
+        "min_score": 75,
+        "max_score": 100
+      },
+      {
+        "id": "r02-e07",
+        "category": "verdict",
+        "assertion": "Verdict is Mobile-ready",
+        "must_be_verdict": "Mobile-ready"
+      }
+    ]
+  }
+]

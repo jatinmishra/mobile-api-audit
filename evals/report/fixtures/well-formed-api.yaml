@@ -1,0 +1,273 @@
+openapi: "3.0.3"
+info:
+  title: Acme Notifications API
+  version: "3.0.0"
+  description: Delivers and manages in-app notifications for mobile clients.
+  contact:
+    name: Platform Team
+    email: platform@acme.com
+  x-changelog: https://developers.acme.com/changelog/notifications
+
+servers:
+  - url: https://api.acme.com/v3
+    description: Production
+  - url: https://api-staging.acme.com/v3
+    description: Staging
+
+paths:
+  /notifications:
+    get:
+      summary: List notifications
+      operationId: listNotifications
+      parameters:
+        - name: after_cursor
+          in: query
+          schema:
+            type: string
+          description: Cursor for next page — from previous response next_cursor field
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+        - name: fields
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of fields to include, e.g. id,title,read_at
+      responses:
+        "200":
+          description: Paginated notifications
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: "private, max-age=30, stale-while-revalidate=60"
+            ETag:
+              schema:
+                type: string
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+            X-Request-Id:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                  next_cursor:
+                    type: string
+                    nullable: true
+                  has_more:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /notifications/{id}:
+    get:
+      summary: Get notification
+      operationId: getNotification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Notification detail
+          headers:
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+            X-Request-Id:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /notifications/{id}/read:
+    post:
+      summary: Mark notification as read
+      operationId: markNotificationRead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Client-generated UUID — safe to retry with same key
+      responses:
+        "200":
+          description: Updated notification
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /notifications/bulk-read:
+    post:
+      summary: Mark multiple notifications as read
+      operationId: bulkMarkRead
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 50
+      responses:
+        "200":
+          description: Bulk update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                  failed:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.acme.com/oauth/authorize
+          tokenUrl: https://auth.acme.com/oauth/token
+          refreshUrl: https://auth.acme.com/oauth/token
+          scopes:
+            notifications:read: Read notifications
+            notifications:write: Mark notifications as read
+
+  schemas:
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [booking_update, event_reminder, system]
+
+    Error:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          example: RESOURCE_NOT_FOUND
+        message:
+          type: string
+          description: Human-readable description
+        request_id:
+          type: string
+          description: Use this when contacting support
+
+  responses:
+    Unauthorized:
+      description: Authentication required or token expired
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until rate limit resets
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflict with current state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+security:
+  - oauth2: [notifications:read]

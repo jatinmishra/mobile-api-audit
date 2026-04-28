@@ -1,0 +1,92 @@
+[
+  {
+    "id": "t01",
+    "query": "evaluate this openapi spec for mobile readiness",
+    "should_trigger": true,
+    "notes": "Exact skill use case"
+  },
+  {
+    "id": "t02",
+    "query": "is our bookings API mobile-friendly? here is the spec",
+    "should_trigger": true,
+    "notes": "Natural phrasing \u2014 mobile-friendly = mobile readiness"
+  },
+  {
+    "id": "t03",
+    "query": "review this HAR file and tell me if the API is good for mobile",
+    "should_trigger": true,
+    "notes": "HAR input, mobile intent"
+  },
+  {
+    "id": "t04",
+    "query": "audit this API for mobile",
+    "should_trigger": true,
+    "notes": "Short action-word trigger"
+  },
+  {
+    "id": "t05",
+    "query": "check this spec, we are building a mobile app and want to know if there are any issues",
+    "should_trigger": true,
+    "notes": "Implicit readiness check"
+  },
+  {
+    "id": "t06",
+    "query": "what is wrong with this API for mobile?",
+    "should_trigger": true,
+    "notes": "Explicit quality check, mobile context"
+  },
+  {
+    "id": "t07",
+    "query": "grade this API spec for our mobile team",
+    "should_trigger": true,
+    "notes": "Grade = evaluate/audit"
+  },
+  {
+    "id": "t08",
+    "query": "here is our swagger file, can you assess it for mobile consumption?",
+    "should_trigger": true,
+    "notes": "Swagger=OpenAPI, consumption=readiness"
+  },
+  {
+    "id": "t09",
+    "query": "we are handing this API off to the iOS team. any concerns?",
+    "should_trigger": true,
+    "notes": "Implicit mobile readiness \u2014 iOS handoff"
+  },
+  {
+    "id": "t10",
+    "query": "run mobile readiness evaluation on events-api.yaml",
+    "should_trigger": true,
+    "notes": "Exact README command phrasing"
+  },
+  {
+    "id": "t11",
+    "query": "can you look at this HAR and tell me the average response time",
+    "should_trigger": false,
+    "notes": "Single metric request \u2014 not a readiness eval"
+  },
+  {
+    "id": "t12",
+    "query": "write me an OpenAPI spec for a bookings API",
+    "should_trigger": false,
+    "notes": "Creating a spec, not evaluating one"
+  },
+  {
+    "id": "t13",
+    "query": "what is mobile-first API design?",
+    "should_trigger": false,
+    "notes": "General knowledge \u2014 no file, no eval intent"
+  },
+  {
+    "id": "t14",
+    "query": "fix the authentication bug in my API code",
+    "should_trigger": false,
+    "notes": "Debugging task \u2014 not a readiness evaluation"
+  },
+  {
+    "id": "t15",
+    "query": "convert this swagger 2.0 spec to OpenAPI 3.0 format",
+    "should_trigger": false,
+    "notes": "Format conversion \u2014 no evaluation intent"
+  }
+]

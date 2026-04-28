@@ -1,0 +1,146 @@
+[
+  {
+    "id": "q01",
+    "fixture": "../../examples/acme-events-api.yaml",
+    "description": "Staff scheduling API — offline plausible, RTM ambiguous, auth confirmed",
+    "expectations": [
+      {
+        "id": "q01-e01",
+        "type": "should_ask",
+        "dimension": "offline",
+        "assertion": "Asks about offline access AND references staff assignments or event schedules as the reason",
+        "passing_examples": [
+          "staff assignments and event schedules — data that field workers often need offline",
+          "I can see this returns event and staff data — do users need offline access?"
+        ],
+        "failing_examples": [
+          "Do mobile users need offline access?",
+          "Is offline sync required?"
+        ]
+      },
+      {
+        "id": "q01-e02",
+        "type": "should_ask",
+        "dimension": "rtm",
+        "assertion": "Asks about RTM AND notes that no push/websocket endpoints were found in the spec",
+        "passing_examples": [
+          "The spec has no push or websocket endpoints — is real-time update needed?",
+          "I found no RTM endpoints — does the app need live data changes?"
+        ],
+        "failing_examples": [
+          "Does this API need real-time updates?",
+          "Is RTM required?"
+        ]
+      },
+      {
+        "id": "q01-e03",
+        "type": "should_not_ask",
+        "dimension": "auth",
+        "assertion": "Does NOT ask about authentication — JWT Bearer is confirmed in securitySchemes",
+        "reason": "components.securitySchemes.bearerAuth is present — auth type is determinable from spec"
+      },
+      {
+        "id": "q01-e04",
+        "type": "should_not_ask",
+        "dimension": "versioning",
+        "assertion": "Does NOT ask about versioning — /v2/ is present in the server URL",
+        "reason": "servers[0].url = https://api.acme.com/v2 — version is in the path"
+      },
+      {
+        "id": "q01-e05",
+        "type": "should_ask",
+        "dimension": "idempotency",
+        "assertion": "Asks about write frequency OR flags POST /bookings missing idempotency AND references the specific endpoint",
+        "passing_examples": [
+          "POST /bookings has no idempotency key — how often does mobile create bookings?",
+          "I noticed /bookings has no Idempotency-Key support — is this called automatically or manually?"
+        ],
+        "failing_examples": [
+          "Are write endpoints called frequently?",
+          "Does the app retry failed requests?"
+        ]
+      },
+      {
+        "id": "q01-e06",
+        "type": "should_infer_not_ask",
+        "dimension": "pagination",
+        "assertion": "States an inference about offset pagination rather than asking — offset+limit params are visible in spec",
+        "passing_examples": [
+          "I can see /events uses offset+limit pagination — I'll flag this as a concern",
+          "Treating /events as offset-paginated based on the offset and limit params"
+        ],
+        "failing_examples": [
+          "What type of pagination does this API use?"
+        ]
+      },
+      {
+        "id": "q01-e07",
+        "type": "max_questions",
+        "assertion": "Asks no more than 5 questions total",
+        "threshold": 5
+      }
+    ]
+  },
+  {
+    "id": "q02",
+    "fixture": "payment-api.yaml",
+    "description": "Payment processing API — online-only, ephemeral data, no offline or RTM needed",
+    "expectations": [
+      {
+        "id": "q02-e01",
+        "type": "should_not_ask",
+        "dimension": "offline",
+        "assertion": "Does NOT ask about offline sync — payment flows are inherently online, should be inferred",
+        "reason": "Endpoints are /payments, /charges, /refunds — payment processing is an online-only operation"
+      },
+      {
+        "id": "q02-e02",
+        "type": "should_not_ask",
+        "dimension": "rtm",
+        "assertion": "Does NOT ask about RTM — or if it does, frames it as unlikely given the payment context",
+        "reason": "Payment creation and retrieval are transactional — RTM push is rarely needed"
+      },
+      {
+        "id": "q02-e03",
+        "type": "should_ask",
+        "dimension": "idempotency",
+        "assertion": "Asks about or flags idempotency for POST /payments AND references the financial risk",
+        "passing_examples": [
+          "POST /payments — a duplicate charge from a retry would be a serious issue. Is there an idempotency key?",
+          "I see no Idempotency-Key on payment creation — retries could cause double charges"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q03",
+    "fixture": "har-with-headers.har",
+    "description": "HAR with rate limit headers, ETag, and Accept-Language — these should not be asked about",
+    "expectations": [
+      {
+        "id": "q03-e01",
+        "type": "should_not_ask",
+        "dimension": "rate_limiting",
+        "assertion": "Does NOT ask about rate limits — X-RateLimit-* headers are present in the HAR responses",
+        "reason": "HAR shows X-RateLimit-Limit: 1000 and X-RateLimit-Remaining headers — confirmed from traffic"
+      },
+      {
+        "id": "q03-e02",
+        "type": "should_not_ask",
+        "dimension": "localisation",
+        "assertion": "Does NOT ask about localisation — Accept-Language header is present in HAR requests",
+        "reason": "HAR requests include Accept-Language: en-US — localisation is already being handled client-side"
+      },
+      {
+        "id": "q03-e03",
+        "type": "should_infer_not_ask",
+        "dimension": "caching",
+        "assertion": "States an inference about caching from ETag headers rather than asking",
+        "passing_examples": [
+          "ETag headers are present in responses — I'll treat caching as partially supported",
+          "Treating caching as present based on ETag observed in HAR"
+        ]
+      }
+    ]
+  }
+]
