@@ -3,14 +3,17 @@ name: mobile-api-audit
 description: >
   Evaluates whether an API is ready for mobile consumption. Use this skill
   whenever a user wants to assess, audit, or evaluate an API for mobile use,
-  even if they do not use those exact words. Triggers include dropping an
+  even if they do not use those exact words. Triggers include: dropping an
   OpenAPI spec, HAR file, or cURL commands and asking for a review, analysis,
   audit, or report; asking if an API is mobile-friendly; asking what is wrong
   with an API for mobile; asking to check or grade an API; or any request to
   generate a mobile readiness report. Input can be OpenAPI or Swagger JSON or
-  YAML, HAR traffic captures, raw cURL commands, or any mix of these. Always
-  use this skill when the user provides API specs or traffic data and wants any
-  kind of quality or readiness assessment.
+  YAML, HAR traffic captures, raw cURL commands, or any mix of these. Before
+  proceeding, if the user provides no mobile context and no mobile endpoints
+  are evident from the input, ask: "Is this API consumed by a mobile client?"
+  — if the answer is no, decline politely and explain the skill is scoped to
+  mobile API readiness. Only use this skill when the API is confirmed or likely
+  mobile-consumed.
 license: MIT
 ---
 
@@ -22,18 +25,16 @@ Analyse API inputs (OpenAPI specs, HAR files, cURL commands) and produce an exha
 
 ## Process overview
 
-1. **Parse inputs** — detect and read each file the user provides
-2. **Ask clarifying questions** — ask the human about context that cannot be inferred from the spec
+1. **Read inputs** — detect and parse every file the user provides
+2. **Ask clarifying questions** — use `AskUserQuestion` to collect context that cannot be inferred from the spec
 3. **Extract signals** — pull every mobile-relevant signal from the inputs
 4. **Score** — apply the scoring model, using answers from step 2 to set N/A correctly
 5. **Write report** — generate a self-contained HTML file
 6. **Present** — hand the file back to the user
 
-Do not skip step 2. The clarification answers directly change which dimensions are scored vs marked N/A, which determines whether a missing feature is a real gap or irrelevant noise.
-
 ---
 
-## Step 1 — Detect and read inputs
+### Step 1 — Detect and read inputs
 
 Accept any combination of:
 
@@ -46,6 +47,16 @@ Accept any combination of:
 
 Read every file the user provides. If a `.json` file is ambiguous, peek at its root keys to distinguish HAR from OpenAPI.
 
+#### Partially supported formats
+
+| Format | How to handle |
+|--------|--------------|
+| GraphQL SDL (`.graphql`, `.gql`) | Extract query/mutation/subscription types, field names, auth directives. Note coverage gaps: compression, caching, and HTTP-level headers are not derivable from SDL. |
+| gRPC `.proto` files | Extract service methods, message shapes, streaming patterns. Note that HTTP/2 headers and latency scoring require a HAR from a gRPC-web proxy. |
+| Multi-file OpenAPI with external `$ref` | Resolve local `$ref` targets. For unresolvable external `$ref` (remote URLs, missing files), note which schemas are unresolved and score only available portions. |
+
+For partially supported formats: extract what is available, state coverage gaps in Section 1, and score only what can be determined.
+
 Context the user may provide via flags or conversation:
 
 ```
@@ -54,51 +65,83 @@ Context the user may provide via flags or conversation:
 --consumer  Mobile consumer(s), e.g. "iOS app, Android app"
 --domain    Data domain, e.g. "Events", "Bookings"
 --output    Output path (default: ./mobile-readiness-report.html)
+--mode      Output verbosity: full (default) or quick (Sections 15–17 only)
 ```
 
----
+In `--mode quick`, skip Sections 1–14 and generate only the Known Issues (S15), Proposed Improvements (S16), and Final Verdict (S17) tables. Add a note at the top of the file: *"Quick mode — full report available by re-running without --mode quick."*
 
-## Step 2 — Ask clarifying questions
+```
+```
 
-Read `references/clarification-questions.md` before this step.
+### Step 2 — Ask clarifying questions via AskUserQuestion
 
-**Read the inputs fully first. Then ask only what you cannot determine.**
+Read `references/clarification-questions.md` for question-building rules before this step.
 
-### The process
+**You are running inside Claude Code. Use the `AskUserQuestion` tool for each clarifying question.** This tool pauses execution, renders an interactive prompt with selectable options, waits for the user's input, and returns their answer — exactly like Claude Code's native Q&A. Do NOT print a text block of questions. Call the tool instead.
 
-1. **Build a context model** from the inputs — what does this API do, what data does it serve, what signals are present or absent across each dimension
-2. **Classify each dimension** as: confirmed from input / inferrable / genuinely ambiguous
-3. **For inferrable items** — state your inference in the message, offer the user a chance to correct it. Do not ask a question.
-4. **For genuinely ambiguous items** — ask one targeted question per item that references a specific observation from the input
-5. **Cap at 5 questions**. If more than 5 items are ambiguous, prioritise by scoring weight
+#### Process
 
-### What makes a good question
+1. **Build a context model** from the inputs — classify each dimension as confirmed / inferrable / genuinely ambiguous
+2. **Skip confirmed dimensions** — no call needed if the signal is present in the spec or HAR
+3. **State inferences** — if you can infer a value confidently, say so in a brief message before the question call: *"I'm treating this as an on-screen-load API based on the GET-heavy pattern — correct me if wrong."*
+4. **Batch all genuinely ambiguous dimensions into a single `AskUserQuestion` call.** List all questions in the prompt field, numbered, each with its answer options. Do not make separate sequential calls.
+5. **Cap at 5 questions** — if more than 5 items are ambiguous, prioritise by scoring weight
 
-Every question must:
-- Reference something specific found in the input (a field name, endpoint, observed behaviour)
-- Be answerable in one word
-- Only be asked if the answer materially changes the score or verdict
+#### AskUserQuestion call format
 
-A question that could be asked without reading the file is a bad question.
+Collect all genuinely ambiguous dimensions and ask them in a single call:
 
-### Applying the answers
+```
+AskUserQuestion(
+  prompt: "I have [N] questions before I can run the audit. Please answer below — or type 'skip' to use defaults for all.\n\n1. [One sentence of context]. ([Option A] / [Option B] [/ Option C])\n2. [One sentence of context]. ([Option A] / [Option B])\n...",
+  options: [
+    "Submit answers above",
+    "Skip all — use defaults"
+  ]
+)
+```
+
+**Example call for acme-events-api.yaml:**
+
+```
+AskUserQuestion(
+  prompt: "I have 4 questions before I can run the audit. Please answer below — or type 'skip' to use defaults for all.\n\n1. This API returns staff assignments (/events/{id}/staff) and event schedules — data field workers often need on-site with poor connectivity. Do mobile users need offline access? (Yes, offline needed / No, always online)\n\n2. The spec has no WebSocket, SSE, or push endpoints. If a schedule changes server-side, does the mobile app need to update automatically? (Auto-update needed / Manual refresh is fine)\n\n3. POST /bookings has no Idempotency-Key. A timeout + retry would silently create a duplicate booking. How often does the app create bookings? (Manual only / Automated / Both)\n\n4. Event names, venue addresses, and staff contact details are plain strings. Will this API serve users in multiple languages or locales? (Yes, multiple locales / No, single language only)",
+  options: [
+    "Submit answers above",
+    "Skip all — use defaults"
+  ]
+)
+```
+
+#### If the user skips all questions
+
+If the user selects "Skip — use default" on every question, apply all defaults from `references/clarification-questions.md` and proceed to Step 3 without further interaction.
+
+#### Applying the answers
 
 | Answer | Effect on scoring |
 |--------|------------------|
-| RTM not needed | All RTM rows → N/A, award full 10 pts, no RTM issues |
-| Offline not needed | All offline rows → N/A, award full 12 pts, no offline issues |
+| RTM not needed | Cross-validate first: check if spec contains time-sensitive data endpoints (live status, notifications, order changes). If so, note the tension before applying N/A. If confirmed, all RTM rows → N/A, RTM dimension (10 pts) excluded from denominator, no RTM issues raised. |
+| Offline not needed | Cross-validate first: check if spec contains GET endpoints returning data users act on in the field. If so, note the tension before applying N/A. If confirmed, all offline rows → N/A, Offline dimension (14 pts) excluded from denominator, no offline issues raised. |
+| No locally-persisted mutable collections | All conflict handling rows → N/A, Conflict handling dimension (6 pts) excluded from denominator, no conflict issues raised. Apply when API is read-only, append-only, or auth/config-only. Cross-validate: if PATCH/PUT/DELETE endpoints exist on user-editable resources, note the tension before accepting N/A. |
 | Localisation not needed | All l10n rows → N/A, no deductions for missing l10n |
 | Usage = launch/every-screen | Latency target tightens to <200ms p50; pagination gaps → high severity |
 | Usage = background/rare | Latency less critical; offline sync weighted higher |
 | Planned improvements noted | Record in Notes as "Planned: [desc]"; score current state only |
 
-### If the user skips
+After all calls complete, briefly confirm your interpretation then proceed immediately to Step 3:
 
-If the user says "skip", "just run it", or similar — apply the defaults from `references/clarification-questions.md` and proceed immediately. Do not ask again.
+```
+Got it. Applying:
+- [Dimension]: [answer] → [one-line scoring effect]
+- Inference [accepted / corrected to: X]
+
+Running the audit now...
+```
 
 ---
 
-## Step 3 — Extract signals
+### Step 3 — Extract signals
 
 Read `references/extraction-guide.md` for the full extraction checklist before analysing.
 
@@ -133,61 +176,38 @@ Quick reference — signals to extract per input type:
 - `--data` / `-d` — request body shape
 - `-X` — HTTP method
 
----
-
-## Step 4 — Score across 10 dimensions
+### Step 4 — Score across 10 dimensions
 
 Read `references/scoring-model.md` for exact scoring rules and point allocations.
-Apply clarification answers first — dimensions marked N/A by the user score their full points and are excluded from the known issues list.
+Apply clarification answers first — dimensions marked N/A by the user are excluded from both the earned total and the applicable maximum, and are excluded from the known issues list.
 
 | Dimension | Max pts | Conditional? | Key signals |
 |-----------|---------|-------------|-------------|
-| Performance & scalability | 20 | No — always scored | Pagination type, batching, latency p50/p95, field filtering, compression |
-| Error handling & stability | 15 | No — always scored | Error schema consistency, idempotency, timeout behaviour, 4xx vs 5xx |
-| Offline sync | 12 | **Yes — skip if user says not needed** | Delta/full sync support, sync key, tombstones, cacheability |
+| Performance & scalability | 17 | No — always scored | Pagination type, batching, HTTP/2, latency p50, retry policy, field filtering |
+| Error handling & stability | 15 | No — always scored | Error schema consistency, machine-readable codes, recovery fields (retryable/userActionRequired/queueAction), idempotency, 4xx vs 5xx |
+| Offline sync | 14 | **Yes — excluded from denominator if N/A** | Sync mechanism (opaque cursor > timestamp > full), tombstones + access removal, offline mutations + status echoing, cursor expiry error classes, cache-friendly |
 | Caching & payload | 10 | No — always scored | Cache-Control, ETag, CDN, minimal fields returned |
-| Real-time / RTM | 10 | **Yes — skip if user says not needed** | RTM coverage, contract match, reconnect behaviour |
-| Security | 10 | No — always scored | Auth method, token refresh, scopes, HTTPS, PII exposure |
+| Real-time / RTM | 10 | **Yes — excluded from denominator if N/A** | RTM coverage, contract match, reconnect behaviour |
+| Security | 10 | No — always scored | Auth method (OAuth2/JWT only), PKCE, auth completeness (refresh + step-up + revocation), HTTPS |
 | Rate limiting | 8 | No — always scored | Limits exist, documented, 429 returned, Retry-After header |
-| Versioning & deprecation | 6 | No — always scored | Version in URL/header, sunset policy, changelog |
-| Testing & mocks | 5 | No — always scored | OpenAPI spec currency, sandbox URL, contract tests |
-| Observability | 4 | No — always scored | Dashboard links, SLA defined, tracing |
-| **Total** | **100** | | Deduct 2 pts per confirmed known issue |
+| Versioning & deprecation | 5 | No — always scored | Version in URL/header, sunset policy, minimum supported app version |
+| Testing & mocks | 3 | No — always scored | OpenAPI spec currency, sandbox URL |
+| Observability | 2 | No — always scored | Request ID in responses |
+| Conflict handling | 6 | **Yes — excluded from denominator if N/A** | Conflict policy declared per resource, conflict response shape (clientBaseVersion/serverVersion/conflictingFields), machine-readable conflict code |
+| **Total** | **100** | | |
+
+**Scoring:** Adjusted score = (earned pts) / (100 − N/A dimension maxima) × 100. Deductions are tiered: Critical −5, Major −3, Minor −1 per issue.
 
 Verdict bands: **75–100** Mobile-ready · **50–74** Ready with changes · **0–49** Not mobile-ready
 
----
-
-## Step 5 — Generate the HTML report
+### Step 5 — Generate the HTML report
 
 Read `references/report-template.md` for the full HTML template and all section definitions before writing the file.
 
 The report must be:
 - **Self-contained** — single `.html` file, no external dependencies, works offline
-- **Copy-pasteable into Confluence** — selecting all and pasting must produce native tables and headings
-- **Complete** — all 17 sections present; use "Not found in input" for anything not determinable, never omit a section
-
-Sections:
-
-| # | Section | Scored |
-|---|---------|--------|
-| 1 | API overview | — |
-| 2 | Data characteristics | — |
-| 3 | Mobile usage patterns | — |
-| 4 | Performance & scalability | ✓ 20 pts |
-| 5 | Caching & payload optimisation | ✓ 10 pts |
-| 6 | Offline sync compatibility | ✓ 12 pts |
-| 7 | Real-time / RTM | ✓ 10 pts |
-| 8 | Error handling & stability | ✓ 15 pts |
-| 9 | Rate limiting & throttling | ✓ 8 pts |
-| 10 | Security | ✓ 10 pts |
-| 11 | Localisation & i18n | — |
-| 12 | Versioning & deprecation | ✓ 6 pts |
-| 13 | Testing & mock availability | ✓ 5 pts |
-| 14 | Monitoring & observability | ✓ 4 pts |
-| 15 | Known issues | deductions |
-| 16 | Proposed improvements | — |
-| 17 | Final verdict | — |
+- **Copy-paste friendly** — selecting all and pasting into any doc tool (Confluence, Notion, Jira, etc.) must produce native tables and headings
+- **Complete** — all 18 sections present; use "Not found in input" for anything not determinable, never omit a section
 
 Each evaluation row has four fields:
 - **Criterion** — what is being assessed
@@ -195,17 +215,15 @@ Each evaluation row has four fields:
 - **Notes** — specific evidence from the input, parameter names, example values, or "Not found in input"
 - **Evidence** — the exact line/field in the source that led to this finding (e.g. `paths./events.get.parameters[2].name = "offset"`)
 
----
-
-## Step 6 — Write and present the file
+### Step 6 — Write and present the file
 
 Write the report to the output path (default: `./mobile-readiness-report.html`).
 
 Then tell the user:
 - The output path
-- The final score and verdict
+- The final score and verdict (from Section 18)
 - The top 3 confirmed issues
-- How to paste into Confluence (select all → copy → paste)
+- How to copy the report (select all → copy → paste into your doc tool)
 
 Keep this summary to 5–8 lines. The report has the full detail.
 
@@ -213,12 +231,13 @@ Keep this summary to 5–8 lines. The report has the full detail.
 
 ## Rules
 
-- **Always ask before scoring.** Never skip the clarification step. The answers determine which dimensions are N/A vs scored.
-- **N/A ≠ skip.** When a dimension is N/A, still include its section in the report — mark every row as N/A with a note explaining why (e.g. "User confirmed: offline access not required for this API").
-- **N/A dimensions score full points.** A dimension that doesn't apply is not a gap — it scores its maximum and is excluded from known issues.
+- **One turn if pre-supplied, two turns otherwise.** If the user's first message includes explicit answers to all clarification dimensions (RTM, offline, locale, usage pattern), skip the question step and proceed in one turn. State the applied context before scoring (e.g. *"Applying: RTM not needed, offline needed, single locale, blocking on launch — running audit now..."*). If any dimension is ambiguous, make one batched `AskUserQuestion` call with all questions (max 5) in a single prompt. After the user replies, run the audit in a final turn.
+- **Ask before scoring when needed.** If any clarification dimension is genuinely ambiguous and not pre-supplied, use the AskUserQuestion step. The answers determine which dimensions are N/A vs scored.
+- **N/A ≠ skip.** When a dimension is N/A, still include its section in the report — mark every row as N/A with a note explaining why.
+- **N/A dimensions are excluded from both numerator and denominator.** A dimension that doesn't apply neither helps nor hurts the score — exclude its points from both the earned total and the applicable maximum. Do not award its points; do not penalise their absence. See scoring-model.md for the adjusted-score formula.
 - **Never omit a section.** If you cannot determine a value from the inputs, write "Not found in input" and set status to `unknown`. Do not skip the row.
 - **Never fabricate.** If a signal is absent from the inputs, say so — do not assume a best-case value.
-- **Be specific.** Notes must reference actual field names, header values, or parameter names from the input. "Pagination not found" is not specific. "No `cursor`, `after`, `before`, or `next_cursor` parameter found in any path" is specific.
+- **Be specific.** Notes must reference actual field names, header values, or parameter names from the input.
 - **Score conservatively.** Absence of evidence is evidence of absence for mobile readiness. If a feature isn't in the spec, assume it doesn't exist.
-- **Known issues = confirmed only.** Only list issues you found direct evidence for. Speculative issues go in the notes column of the relevant section row, not in the known issues list.
+- **Known issues = confirmed only.** Only list issues you found direct evidence for. Speculative issues go in the notes column, not the known issues list.
 - **Planned work = noted, not scored.** If the user mentions planned improvements, record them in Notes as "Planned: [description]". Score the current state only.
