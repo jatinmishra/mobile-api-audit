@@ -9,7 +9,7 @@ Full HTML structure for the generated report. Write this as a single self-contai
 ```
 <head> — styles (inline, no external deps)
 <body>
-  .copy-bar        — "Select all + Copy for Confluence" instruction bar
+  .copy-bar        — "Select all" instruction bar (copy-friendly for any destination)
   .header          — API name, score badge, verdict, meta row
   .score-panel     — dimension bars + deduction summary
   sections 1–17    — evaluation tables
@@ -20,7 +20,7 @@ Full HTML structure for the generated report. Write this as a single self-contai
 
 ## CSS design tokens
 
-Use these exact values for Confluence paste compatibility:
+Design tokens used throughout the report:
 
 ```css
 /* Colours */
@@ -114,8 +114,8 @@ Rows:
 - Max records per response
 - Data sensitivity (PII fields listed)
 - Schema formally documented
-- Schema stability
-- API dependency chain
+- Schema stability — default status: `unknown`. Mark as "Requires manual input — cannot be inferred from spec or HAR." Do not infer or assume a value.
+- API dependency chain — default status: `unknown`. Mark as "Requires manual input — cannot be inferred from spec or HAR." Do not infer or assume a value.
 
 ### Section 3 — Mobile usage patterns
 
@@ -128,15 +128,17 @@ Rows (all sourced from context or inferred from endpoint names):
 - Expected calls per session
 - Expected concurrent callers
 
-### Section 4 — Performance & scalability (20 pts)
+**Inference rule:** All rows in this section that are inferred (not user-confirmed or directly observed in HAR) must include the tag `[inferred]` in the Notes column and a brief explanation of the inference (e.g. `[inferred] GET-heavy traffic pattern with no explicit scheduling context`). User-confirmed answers from the clarifying questions step should be marked `[confirmed]`. Never present inferred values as facts — they feed latency scoring targets, so the user must be able to correct them.
+
+### Section 4 — Performance & scalability (17 pts)
 
 Rows:
 - Pagination type (with param names)
-- Max page size configurable
+- HTTP/2 / connection reuse
 - Batching / bulk endpoint support
 - Average latency p50
 - Latency p95
-- Field filtering / sparse fieldsets
+- Field filtering / sparse fieldsets (including named projections)
 - Response compression
 - Minimal response data
 
@@ -151,14 +153,16 @@ Rows:
 - Image/media URLs via CDN
 - Pagination cursor stable
 
-### Section 6 — Offline sync (12 pts)
+### Section 6 — Offline sync (14 pts)
 
 Rows:
-- Sync mechanism (delta/full/none/not-required)
+- Sync mechanism (opaque cursor delta / timestamp delta / full / none / not-required)
 - Sync key type and parameter name
-- Deleted record signalling (tombstones)
+- Deleted record signalling (tombstones / deletedAt)
+- Access removal signalling (explicit removal events when user loses permission — absence ≠ removal)
+- Offline mutation support (client operationId + mutation status echoing: accepted/applied/conflicted/rejected_*)
+- Cursor expiry error classes (SYNC_CURSOR_EXPIRED / SYNC_CURSOR_INVALID / SYNC_CURSOR_INCOMPATIBLE / SYNC_CURSOR_REVOKED)
 - Results safely cacheable on device
-- Conflict resolution strategy
 - Sync tested under large dataset
 - Impact if offline sync missing
 
@@ -177,9 +181,9 @@ Rows:
 Rows:
 - Consistent error response schema
 - Machine-readable error codes
+- Error recovery fields (`retryable`, `userActionRequired`, `queueAction`)
 - GET endpoints retry-safe
-- Write endpoints idempotent
-- Idempotency-Key header support
+- Write endpoints idempotent (Idempotency-Key or client operationId)
 - Timeout behaviour documented
 - Circuit breaker / graceful degradation
 - 4xx vs 5xx correctly distinguished
@@ -201,15 +205,29 @@ Rows:
 Rows:
 - Authentication method
 - Token refresh documented
+- Step-up auth challenge defined (STEP_UP_REQUIRED error shape)
+- Session / device revocation behaviour (what happens to queued mutations on revocation)
 - Token expiry / 401 behaviour
 - Scopes / permissions required
-- Principle of least privilege
 - HTTPS enforced
 - PII in response body
 - Sensitive data in URL params
 - Mobile-specific risks
 
-### Section 11 — Localisation & i18n
+### Section 11 — Conflict handling (6 pts) ⚠️ CONDITIONAL
+
+Mark entire section N/A if API has no locally-persisted mutable collections (read-only, append-only, or auth/config-only). Include a note explaining why.
+
+Rows:
+- Conflict policy declared per mutable resource (client_resolves / server_merges / last_writer_wins / append_only / reject_when_stale)
+- Conflict response includes client base version (clientBaseVersion or equivalent)
+- Conflict response includes current server version (serverVersion or current ETag)
+- Conflict response includes conflicting field list (conflictingFields) or full server resource
+- queueAction in conflict errors (rebase = server confirms replay is safe; retain/drop/modify also valid)
+- Machine-readable conflict error code (CONFLICT_* separate from generic 409)
+- User-authored content does not default to last-writer-wins
+
+### Section 12 — Localisation & i18n
 
 Rows:
 - Localisation support (full/partial/none/not-required)
@@ -220,7 +238,7 @@ Rows:
 - Supported locales
 - Fallback locale behaviour
 
-### Section 12 — Versioning & deprecation (6 pts)
+### Section 13 — Versioning & deprecation (5 pts)
 
 Rows:
 - Versioning strategy
@@ -228,39 +246,40 @@ Rows:
 - Deprecation notice period
 - Sunset header used
 - Old versions still supported
-- Changelog maintained
+- Minimum supported app version declared (per iOS/Android platform)
 - Mobile team notified of changes
 
-### Section 13 — Testing & mock availability (5 pts)
+### Section 14 — Testing & mock availability — mobile team impact (3 pts)
+
+> **Mobile team impact:** These rows assess whether the backend team's testing practices protect the mobile team from silent breaking changes. Mobile releases take 1–2 weeks through App Store review — a backend deploy can break a shipped app with no ability to hotfix in minutes. A sandbox and contract tests are not backend-quality concerns; they are the mobile team's safety net.
 
 Rows:
 - OpenAPI spec current and complete
 - Sandbox / staging environment
 - Mock server available
 - Representative test data
-- Contract tests in CI
-- Consumer-driven contract tests
 - Postman / Bruno collection
 - Known staging limitations
 
-### Section 14 — Monitoring & observability (4 pts)
+### Section 15 — Monitoring & observability — mobile team impact (2 pts)
+
+> **Mobile team impact:** These rows assess what debugging capability the mobile team has after shipping. When a user files a crash report from the field, `X-Request-Id` is the only thread available to correlate the crash with server logs. Without it, diagnosing production issues in a shipped mobile release is guesswork.
 
 Rows:
 - Request ID returned in responses
 - Latency dashboard exists
 - Error rate dashboard exists
 - Alerting configured
-- SLA / SLO defined
 - Distributed tracing available
-- Mobile-specific metrics
+- Mobile-specific metrics (sliced by app version, platform, OS version)
 - Incident history / status page
 
-### Section 15 — Known issues
+### Section 16 — Known issues
 
-Table with columns: Issue | Severity (high/med/low) | Impact / Notes
+Table with columns: Issue | Severity (Critical/Major/Minor) | Deduction | Impact / Notes
 
 Only include confirmed issues with direct evidence.
-Each issue deducts 2 points.
+Deductions by severity: Critical = −5 pts, Major = −3 pts, Minor = −1 pt.
 
 Checklist to verify against (mark only confirmed):
 - No pagination on list endpoints
@@ -272,7 +291,15 @@ Checklist to verify against (mark only confirmed):
 - No HTTP cache headers
 - No offline sync (where needed)
 - No tombstones for deleted records
-- Conflict resolution undefined
+- Access removal not signalled through sync (users retain records after losing permission)
+- Offline mutations without client operation IDs (queue cannot track applied state)
+- Cursor expiry error classes not defined (client cannot distinguish security reset from expired history)
+- No conflict policy declared on mutable resources
+- Conflict response is bare 409/412 with no version metadata (client cannot surface merge UX)
+- No machine-readable conflict error code
+- Error responses lack recovery fields (retryable / userActionRequired / queueAction)
+- No step-up auth challenge defined
+- No session revocation behaviour documented
 - No RTM (where needed)
 - RTM/REST contract mismatch
 - Multiple sequential calls required
@@ -283,45 +310,48 @@ Checklist to verify against (mark only confirmed):
 - No Retry-After on 429
 - Non-token auth
 - Token refresh not handled
-- Over-scoped permissions
 - PII exposure risk
 - No versioning strategy
 - No sunset/deprecation policy
+- No minimum app version in config/capabilities endpoint
 - No sandbox environment
 - OpenAPI spec missing/outdated
-- No contract tests
 - No observability dashboards
-- No SLA/SLO defined
 - Data model mismatch
 - Localisation gaps (where needed)
 
-### Section 16 — Proposed improvements
+### Section 17 — Proposed improvements
 
 Table: Improvement | Priority (High/Med/Low) | Reasoning
 
 Every confirmed known issue must have a row.
 Prioritise: High = blocks mobile shipment, Med = degrades UX, Low = best practice.
 
-### Section 17 — Final verdict
+### Section 18 — Final verdict
 
 Table:
-- Raw score (sum of dimensions)
-- Deductions (N issues × 2)
-- Adjusted total
+- Earned score (sum of scored dimension points, excluding N/A dimensions)
+- Applicable maximum (100 − sum of N/A dimension maxima)
+- Deductions (itemised by severity: Critical −5, Major −3, Minor −1)
+- Adjusted score ((earned − deductions) / applicable maximum × 100, rounded to nearest integer)
 - Verdict (Mobile-ready / Ready with changes / Not mobile-ready)
+- Evidence confidence (High / Medium / Low — see scoring model)
+- Score position — where score sits within its band (e.g. "83/100 — upper end of Mobile-ready (75–100 band)")
+- Audit coverage — input types provided (e.g. "Spec only", "Spec + HAR", "HAR only", "Spec + cURL")
+- Blocker triggered — any hard-cap condition that applied, or "None"
 - Top 3 risks
 - Engineering recommendation
 - Conditions for approval (if Ready with changes)
 
 ---
 
-## Copy-for-Confluence button
+## Select-all bar
 
 Add this at the top of the page (position: fixed, does not get copied):
 
 ```html
 <div class="copy-bar">
-  <span>Open in browser → <strong>Select all</strong> (Cmd/Ctrl+A) → Copy → Paste into Confluence</span>
+  <span>Open in browser → <strong>Select all</strong> (Cmd/Ctrl+A) → Copy</span>
   <button onclick="selectContent()">Select all</button>
 </div>
 ```
@@ -356,7 +386,8 @@ Example structure:
   <div class="score-display">
     <span class="score-num" style="color: [green|amber|red]">72</span>
     <span class="score-denom">/100</span>
-    <div class="deductions">−4 (2 issues × 2)</div>
+    <!-- If N/A dimensions applied, show: earned/applicable e.g. "56 of 78 applicable pts → 72" -->
+    <div class="deductions">−6 (1 critical × 5, 1 minor × 1)</div>
   </div>
   <div class="dimension-bars">
     <!-- one row per dimension -->
@@ -370,5 +401,18 @@ Example structure:
   <div class="verdict-box">
     <span class="verdict warn">Ready with changes</span>
   </div>
+</div>
+```
+
+When no HAR is present, add this caveat below the score panel:
+
+```html
+<div class="panel note">
+  <strong>Audit coverage: spec only.</strong> Three dimensions cannot be confirmed
+  without live traffic data: response compression, HTTP cache headers, and rate-limit
+  headers. These rows default to <code>unknown</code> rather than <code>bad</code>.
+  Latency scores are estimated, not measured. Client context headers (X-App-Version,
+  X-Platform, X-OS-Version) and actual conflict/error shapes are also unverifiable
+  without a HAR capture. Providing a HAR will produce a more accurate score.
 </div>
 ```
