@@ -2,7 +2,7 @@
 
 A Claude Code skill that analyses API inputs and generates an exhaustive mobile consumption readiness report as a standalone HTML file.
 
-Drop in an OpenAPI spec, HAR traffic capture, or cURL commands — the skill extracts every mobile-relevant signal, scores the API across 10 dimensions, and writes a complete report you can open in a browser or paste directly into Confluence.
+Drop in an OpenAPI spec, HAR traffic capture, or cURL commands — the skill extracts every mobile-relevant signal, scores the API across 10 dimensions, and writes a complete report you can open in any browser.
 
 ---
 
@@ -105,7 +105,7 @@ A single `mobile-readiness-report.html` file that:
 - Shows a score panel with per-dimension bars
 - Has all 17 sections fully filled from your inputs
 - Marks anything not found in inputs as "Not found in input" (never fabricates)
-- Has a **Copy for Confluence** button — select all, copy, paste into any Confluence page
+- Has a **Select all** button — select all, copy, paste into any doc tool (Confluence, Notion, Jira, etc.)
 
 ---
 
