@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobile Readiness Report — Acme Events API</title>
+<style>
+  :root {
+    --text:       #172B4D;
+    --text-mid:   #42526E;
+    --text-sub:   #6B778C;
+    --text-hint:  #97A0AF;
+    --surface:    #F4F5F7;
+    --border:     #DFE1E6;
+    --green-bg:   #E3FCEF; --green-txt:  #006644;
+    --yellow-bg:  #FFFAE6; --yellow-txt: #974F0C;
+    --red-bg:     #FFEBE6; --red-txt:    #BF2600;
+    --blue-bg:    #DEEBFF; --blue-txt:   #0747A6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: #fff;
+    padding-bottom: 60px;
+  }
+  .copy-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: #0747A6;
+    color: #fff;
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 999;
+    font-size: 13px;
+  }
+  .copy-bar button {
+    background: #fff;
+    color: #0747A6;
+    border: none;
+    border-radius: 3px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #content { padding-top: 50px; }
+  .header {
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    padding: 24px 32px 20px;
+  }
+  .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .header .meta { color: var(--text-mid); font-size: 13px; display: flex; gap: 24px; flex-wrap: wrap; margin-top: 10px; }
+  .header .meta span { display: flex; align-items: center; gap: 6px; }
+  .header .meta strong { color: var(--text); }
+
+  /* Score panel */
+  .score-panel {
+    display: grid;
+    grid-template-columns: 160px 1fr 200px;
+    gap: 24px;
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+    align-items: start;
+  }
+  .score-display { text-align: center; padding-top: 8px; }
+  .score-num { font-size: 64px; font-weight: 800; line-height: 1; color: #BF2600; }
+  .score-denom { font-size: 28px; font-weight: 400; color: var(--text-hint); }
+  .score-label { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+  .deductions { font-size: 12px; color: #BF2600; margin-top: 6px; font-weight: 600; }
+
+  .dimension-bars { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+  .dim-row { display: flex; align-items: center; gap: 10px; }
+  .dim-name { font-size: 12px; color: var(--text-mid); width: 160px; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 10px; background: var(--surface); border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; }
+  .dim-pts { font-size: 12px; color: var(--text-mid); width: 36px; text-align: right; flex-shrink: 0; }
+
+  .verdict-box { text-align: center; padding-top: 12px; }
+  .verdict-chip {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 14px;
+    background: var(--red-bg);
+    color: var(--red-txt);
+  }
+  .verdict-chip.warn { background: var(--yellow-bg); color: var(--yellow-txt); }
+  .verdict-chip.good { background: var(--green-bg); color: var(--green-txt); }
+  .verdict-score-note { font-size: 12px; color: var(--text-sub); margin-top: 10px; }
+
+  /* Sections */
+  section { padding: 24px 32px 0; }
+  section h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  .section-pts {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-sub);
+    margin-left: 8px;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
+  th {
+    background: var(--surface);
+    color: var(--text-mid);
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    font-weight: 600;
+  }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; color: var(--text); }
+  tr:nth-child(even) td { background: #FAFBFC; }
+  td code { font-family: monospace; font-size: 12px; background: var(--surface); padding: 1px 4px; border-radius: 2px; }
+
+  /* Status pills */
+  .s-good, .s-warn, .s-bad, .s-na, .s-unknown {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .s-good    { background: var(--green-bg);  color: var(--green-txt); }
+  .s-warn    { background: var(--yellow-bg); color: var(--yellow-txt); }
+  .s-bad     { background: var(--red-bg);    color: var(--red-txt); }
+  .s-na      { background: var(--surface);   color: var(--text-sub); }
+  .s-unknown { background: var(--surface);   color: var(--text-hint); }
+
+  /* Panels */
+  .panel {
+    border-left: 4px solid;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    border-radius: 0 4px 4px 0;
+    font-size: 13px;
+  }
+  .panel.info  { border-color: #0747A6; background: var(--blue-bg);   color: var(--blue-txt); }
+  .panel.tip   { border-color: #006644; background: var(--green-bg);  color: var(--green-txt); }
+  .panel.warn  { border-color: #974F0C; background: var(--yellow-bg); color: var(--yellow-txt); }
+  .panel.note  { border-color: #97A0AF; background: var(--surface);   color: var(--text-sub); }
+
+  /* Severity chips for known issues */
+  .sev-high { background: var(--red-bg); color: var(--red-txt); padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 700; }
+  .sev-med  { background: var(--yellow-bg); color: var(--yellow-txt); padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 700; }
+  .sev-low  { background: var(--surface); color: var(--text-sub); padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }
+
+  /* Priority chips */
+  .pri-high { background: var(--red-bg); color: var(--red-txt); padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 700; }
+  .pri-med  { background: var(--yellow-bg); color: var(--yellow-txt); padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 700; }
+  .pri-low  { background: var(--surface); color: var(--text-sub); padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }
+
+  .top-risks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .risk-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 4px; background: #FAFBFC; }
+  .risk-num  { font-weight: 800; font-size: 16px; color: var(--red-txt); width: 24px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="copy-bar">
+  <span>Open in browser &rarr; <strong>Select all</strong> (Cmd/Ctrl+A) &rarr; Copy</span>
+  <button onclick="selectContent()">Select all</button>
+</div>
+
+<div id="content">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HEADER
+═══════════════════════════════════════════════════════════════ -->
+<div class="header">
+  <h1>Mobile Readiness Report — Acme Events API</h1>
+  <div class="meta">
+    <span><strong>Version:</strong> 2.1.0</span>
+    <span><strong>Report date:</strong> 2026-05-02</span>
+    <span><strong>Input:</strong> OpenAPI 3.0.3 spec (acme-events-api.yaml)</span>
+    <span><strong>Consumer context:</strong> Mobile (offline required, multi-locale, auto-update needed)</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SCORE PANEL
+═══════════════════════════════════════════════════════════════ -->
+<div class="score-panel">
+  <div class="score-display">
+    <div>
+      <span class="score-num">0</span><span class="score-denom">/100</span>
+    </div>
+    <div class="score-label">Adjusted score</div>
+    <div class="deductions">−30 (15 issues &times; 2)</div>
+    <div class="score-label" style="margin-top:6px;">Raw: 24 &rarr; floor 0</div>
+  </div>
+
+  <div class="dimension-bars">
+    <div class="dim-row">
+      <span class="dim-name">Performance &amp; scalability</span>
+      <div class="bar-track"><div class="bar-fill" style="width:30%; background:#F59E0B;"></div></div>
+      <span class="dim-pts">6/20</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Error handling &amp; stability</span>
+      <div class="bar-track"><div class="bar-fill" style="width:33%; background:#F59E0B;"></div></div>
+      <span class="dim-pts">5/15</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Offline sync</span>
+      <div class="bar-track"><div class="bar-fill" style="width:8%; background:#EF4444;"></div></div>
+      <span class="dim-pts">1/12</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Caching &amp; payload</span>
+      <div class="bar-track"><div class="bar-fill" style="width:0%; background:#EF4444;"></div></div>
+      <span class="dim-pts">0/10</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Real-time / RTM</span>
+      <div class="bar-track"><div class="bar-fill" style="width:0%; background:#EF4444;"></div></div>
+      <span class="dim-pts">0/10</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Security</span>
+      <div class="bar-track"><div class="bar-fill" style="width:60%; background:#F59E0B;"></div></div>
+      <span class="dim-pts">6/10</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Rate limiting</span>
+      <div class="bar-track"><div class="bar-fill" style="width:0%; background:#EF4444;"></div></div>
+      <span class="dim-pts">0/8</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Versioning &amp; deprecation</span>
+      <div class="bar-track"><div class="bar-fill" style="width:50%; background:#F59E0B;"></div></div>
+      <span class="dim-pts">3/6</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Testing &amp; mocks</span>
+      <div class="bar-track"><div class="bar-fill" style="width:60%; background:#F59E0B;"></div></div>
+      <span class="dim-pts">3/5</span>
+    </div>
+    <div class="dim-row">
+      <span class="dim-name">Observability</span>
+      <div class="bar-track"><div class="bar-fill" style="width:0%; background:#EF4444;"></div></div>
+      <span class="dim-pts">0/4</span>
+    </div>
+  </div>
+
+  <div class="verdict-box">
+    <div class="verdict-chip">Not mobile-ready</div>
+    <div class="verdict-score-note" style="margin-top:12px;">
+      Score band: 0–49 = Not mobile-ready<br>
+      Raw score: 24/100<br>
+      Deductions: 15 &times; 2 = 30<br>
+      Adjusted: 0 (floored)
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 1 — API OVERVIEW
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>1. API Overview</h2>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>API name</td><td><span class="s-good">Good</span></td><td>Acme Events API</td><td><code>info.title</code></td></tr>
+      <tr><td>Endpoints</td><td><span class="s-good">Good</span></td><td>4 operations: GET /events, GET /events/{id}, GET /events/{id}/staff, POST /bookings</td><td><code>paths</code> (4 path items)</td></tr>
+      <tr><td>Functional purpose</td><td><span class="s-good">Good</span></td><td>Manages events, staff assignments, and bookings for the Acme venue platform</td><td><code>info.description</code></td></tr>
+      <tr><td>Primary consumer(s)</td><td><span class="s-good">Good</span></td><td>Mobile field workers (offline required, multi-locale) — confirmed by user</td><td>User-supplied context</td></tr>
+      <tr><td>Data domain</td><td><span class="s-good">Good</span></td><td>Events, Staff Assignments, Bookings</td><td>Inferred from path names and schema names</td></tr>
+      <tr><td>Team / owner</td><td><span class="s-unknown">Unknown</span></td><td>Not found in input</td><td>—</td></tr>
+      <tr><td>Current version</td><td><span class="s-good">Good</span></td><td>v2.1.0 in spec; <code>/v2</code> in server URL</td><td><code>info.version = "2.1.0"</code>; <code>servers[0].url = "https://api.acme.com/v2"</code></td></tr>
+      <tr><td>OpenAPI spec</td><td><span class="s-good">Good</span></td><td>OpenAPI 3.0.3 spec provided (acme-events-api.yaml)</td><td><code>openapi: "3.0.3"</code></td></tr>
+      <tr><td>Staging / sandbox URL</td><td><span class="s-good">Good</span></td><td>Staging server defined: https://api-staging.acme.com/v2</td><td><code>servers[1].url = "https://api-staging.acme.com/v2"</code></td></tr>
+      <tr><td>Runbook / documentation</td><td><span class="s-unknown">Unknown</span></td><td>Not found in input — no <code>externalDocs</code> defined</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 2 — DATA CHARACTERISTICS
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>2. Data Characteristics</h2>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Response type</td><td><span class="s-good">Good</span></td><td>Mixed — list endpoints (GET /events, GET /events/{id}/staff) and detail endpoints (GET /events/{id}), plus a write endpoint (POST /bookings)</td><td><code>paths</code></td></tr>
+      <tr><td>Typical payload size (p50)</td><td><span class="s-unknown">Unknown</span></td><td>No HAR data provided. Event schema has 18 fields including lat/lng, internal fields, and contact details. Estimated moderate-to-large per record.</td><td>Estimated from <code>components/schemas/Event</code> (18 properties)</td></tr>
+      <tr><td>P95 payload size</td><td><span class="s-unknown">Unknown</span></td><td>No HAR data. List endpoint allows up to 200 records with 18 fields each — worst-case payload could be very large.</td><td><code>paths./events.get.parameters.limit.maximum = 200</code></td></tr>
+      <tr><td>Max records per response</td><td><span class="s-warn">Warn</span></td><td>GET /events: max 200 records per page (configurable). GET /events/{id}/staff: unbounded — no pagination defined.</td><td><code>paths./events.get.parameters.limit.maximum = 200</code>; <code>paths./events/{id}/staff</code> — no limit param</td></tr>
+      <tr><td>Data sensitivity</td><td><span class="s-bad">Bad</span></td><td>Multiple sensitive fields exposed: Event returns <code>billing_code</code>, <code>internal_notes</code>, <code>account_manager_email</code>, <code>account_manager_phone</code>. StaffMember returns <code>hourly_rate</code>, <code>email</code>, <code>phone</code>. No scoping to restrict these to authorised consumers only.</td><td><code>components/schemas/Event.properties</code>; <code>components/schemas/StaffMember.properties</code></td></tr>
+      <tr><td>Schema formally documented</td><td><span class="s-warn">Warn</span></td><td>Schemas defined in components but incomplete — no examples, no descriptions on properties, inconsistent error schema usage</td><td><code>components/schemas</code></td></tr>
+      <tr><td>Schema stability</td><td><span class="s-unknown">Unknown</span></td><td>No change log or breaking-change policy found</td><td>—</td></tr>
+      <tr><td>API dependency chain</td><td><span class="s-warn">Warn</span></td><td>Staff list requires prior call to get event ID (GET /events → GET /events/{id}/staff). Booking creation requires event_id + staff_id from prior calls — sequential dependencies chain 2–3 calls.</td><td><code>paths./events/{id}/staff</code>; <code>paths./bookings.post.requestBody</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 3 — MOBILE USAGE PATTERNS
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>3. Mobile Usage Patterns</h2>
+  <div class="panel info">Inferred from GET-heavy endpoint structure. No HAR data available — inference applied. Latency target tightened to &lt;200ms p50 for on-screen-load calls.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Called on app launch</td><td><span class="s-warn">Warn</span></td><td>Likely — GET /events is the primary list view. No HAR to confirm. Inferred from GET-heavy pattern.</td><td>Inferred</td></tr>
+      <tr><td>Called on every screen load</td><td><span class="s-warn">Warn</span></td><td>Likely for event list and detail views. Each navigation to a staff screen requires GET /events/{id}/staff.</td><td>Inferred from path structure</td></tr>
+      <tr><td>Called during foreground transition</td><td><span class="s-unknown">Unknown</span></td><td>Not found in input</td><td>—</td></tr>
+      <tr><td>Called in background / silent push</td><td><span class="s-bad">Bad</span></td><td>No background sync or push mechanism available — auto-update confirmed needed but not supported</td><td>No push/SSE/WebSocket paths in spec</td></tr>
+      <tr><td>Called on user action</td><td><span class="s-good">Good</span></td><td>POST /bookings is user-initiated (and automated per user — see booking retries issue)</td><td><code>paths./bookings.post</code></td></tr>
+      <tr><td>Expected calls per session</td><td><span class="s-unknown">Unknown</span></td><td>No HAR data — not determinable</td><td>—</td></tr>
+      <tr><td>Expected concurrent callers</td><td><span class="s-unknown">Unknown</span></td><td>No SLA or capacity information in spec</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 4 — PERFORMANCE & SCALABILITY (20 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>4. Performance &amp; Scalability <span class="section-pts">6 / 20 pts</span></h2>
+  <div class="panel warn">Latency target tightened to &lt;200ms p50 — inferred on-screen-load usage. No HAR data; latency scores as 0/4.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Pagination type</td><td><span class="s-warn">Warn</span></td><td><strong>Offset pagination</strong> on GET /events (params: <code>offset</code>, <code>limit</code>). Offset pagination is problematic on mobile — page drift on inserts/deletes, no stable cursor for incremental sync. GET /events/{id}/staff has <em>no pagination at all</em>. Score: 4/8</td><td><code>paths./events.get.parameters[0].name = "offset"</code>; <code>paths./events/{id}/staff</code> — no pagination params</td></tr>
+      <tr><td>Max page size configurable</td><td><span class="s-good">Good</span></td><td>Client-controlled via <code>limit</code> param. Default: 50, maximum: 200. Maximum of 200 is large — clients should use smaller pages on mobile. Score: 2/2</td><td><code>paths./events.get.parameters.limit.default = 50</code>; <code>.maximum = 200</code></td></tr>
+      <tr><td>Batching / bulk endpoint support</td><td><span class="s-bad">Bad</span></td><td>No batch or bulk endpoints. Each booking requires a separate POST. No multi-event or multi-staff batch GET. Score: 0/4</td><td>Single POST at <code>paths./bookings</code> only</td></tr>
+      <tr><td>Average latency p50</td><td><span class="s-unknown">Unknown</span></td><td>No HAR data available — cannot measure. Target for on-screen-load calls: &lt;200ms p50. Score: 0/4</td><td>No HAR provided</td></tr>
+      <tr><td>Latency p95</td><td><span class="s-unknown">Unknown</span></td><td>No HAR data available. Target: &lt;800ms p95. Cannot assess.</td><td>No HAR provided</td></tr>
+      <tr><td>Field filtering / sparse fieldsets</td><td><span class="s-bad">Bad</span></td><td>No <code>fields</code>, <code>select</code>, or <code>expand</code> parameters on any endpoint. Mobile clients must download all 18 Event fields even when only displaying a name and time. Score: 0/2</td><td>No filtering params in any <code>paths</code> entry</td></tr>
+      <tr><td>Response compression</td><td><span class="s-unknown">Unknown</span></td><td>No <code>Content-Encoding</code> headers defined in spec. No HAR to confirm gzip/br in practice. Cannot assess — scored under Caching dimension.</td><td>No response headers defined in spec</td></tr>
+      <tr><td>Minimal response data</td><td><span class="s-bad">Bad</span></td><td>Event schema returns 18 fields including <code>internal_notes</code>, <code>billing_code</code>, <code>account_manager_email</code>, <code>account_manager_phone</code> — admin/internal fields with no mobile display purpose. StaffMember returns <code>hourly_rate</code>. Scored under Caching dimension.</td><td><code>components/schemas/Event.properties</code> (18 fields); <code>components/schemas/StaffMember.properties.hourly_rate</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 5 — CACHING & PAYLOAD (10 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>5. Caching &amp; Payload Optimisation <span class="section-pts">0 / 10 pts</span></h2>
+  <div class="panel warn">No caching infrastructure defined in the spec. Zero points in this dimension — every mobile request hits origin with no opportunity for client-side or CDN caching.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Cache-Control header</td><td><span class="s-bad">Bad</span></td><td>Not defined on any response in the spec. Mobile clients cannot cache event or staff data. Score: 0/4</td><td>No <code>Cache-Control</code> response headers in any <code>paths</code> entry</td></tr>
+      <tr><td>ETag / Last-Modified</td><td><span class="s-bad">Bad</span></td><td>Neither defined. No conditional request support — clients must always re-fetch full payload. Score: 0/2</td><td>No <code>ETag</code> or <code>Last-Modified</code> response headers defined</td></tr>
+      <tr><td>CDN-cacheable</td><td><span class="s-bad">Bad</span></td><td>Without Cache-Control headers, CDN caching is undefined. Even GET /events (which changes infrequently) has no cacheability hints.</td><td>Inferred from absence of Cache-Control</td></tr>
+      <tr><td>Vary header correct</td><td><span class="s-unknown">Unknown</span></td><td>Not defined in spec. With multi-locale support required (user confirmed), correct Vary header is critical.</td><td>No response headers defined</td></tr>
+      <tr><td>Response includes only needed fields</td><td><span class="s-bad">Bad</span></td><td>Event schema includes admin fields (<code>billing_code</code>, <code>internal_notes</code>, <code>account_manager_*</code>) not suitable for mobile display. No field filtering available. Score: 0/2</td><td><code>components/schemas/Event</code> — 18 properties including admin fields</td></tr>
+      <tr><td>Image / media URLs via CDN</td><td><span class="s-na">N/A</span></td><td>No image or media fields found in any schema</td><td>Inferred from absence of image/media fields</td></tr>
+      <tr><td>Pagination cursor stable</td><td><span class="s-bad">Bad</span></td><td>Offset pagination is inherently unstable — inserts between pages cause items to shift, leading to duplicates or gaps in mobile list views. Score: 0/2</td><td><code>paths./events.get.parameters[0].name = "offset"</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 6 — OFFLINE SYNC (12 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>6. Offline Sync <span class="section-pts">1 / 12 pts</span></h2>
+  <div class="panel warn">User confirmed offline access is required for field workers. The API has no delta sync, no tombstones, no ETag, and no Cache-Control — offline is entirely unsupported.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Sync mechanism</td><td><span class="s-bad">Bad</span></td><td>No sync mechanism found. Event schema has <code>updated_at</code> field but no endpoint accepts an <code>updated_since</code> or equivalent filter — the field cannot be used for delta sync. No full-sync endpoint exists either. Score: 0/8</td><td><code>components/schemas/Event.properties.updated_at</code> present; no <code>updated_since</code> param on any path</td></tr>
+      <tr><td>Sync key type and parameter name</td><td><span class="s-bad">Bad</span></td><td>No sync key parameter defined. While <code>updated_at</code> exists in the Event schema, there is no way to query events by modification time.</td><td><code>paths./events.get.parameters</code> — only <code>offset</code>, <code>limit</code>, <code>venue_id</code></td></tr>
+      <tr><td>Deleted record signalling (tombstones)</td><td><span class="s-bad">Bad</span></td><td>No <code>deleted_at</code>, <code>is_deleted</code>, or equivalent field in Event, StaffMember, or Booking schemas. A mobile client that caches data has no way to detect server-side deletions. Score: 0/2</td><td><code>components/schemas/Event</code>, <code>StaffMember</code>, <code>Booking</code> — no deletion fields</td></tr>
+      <tr><td>Results safely cacheable on device</td><td><span class="s-warn">Warn</span></td><td>Stable <code>id</code> fields present in all schemas (partial credit). No ETag or Cache-Control to guide cache duration. Score: 1/2</td><td><code>components/schemas/Event.properties.id</code>, <code>StaffMember.properties.id</code>, <code>Booking.properties.id</code></td></tr>
+      <tr><td>Conflict resolution strategy</td><td><span class="s-bad">Bad</span></td><td>No conflict resolution mechanism defined. With POST /bookings having no idempotency key, concurrent or retry scenarios have undefined behaviour.</td><td>No conflict fields in any schema; no <code>Idempotency-Key</code> on <code>paths./bookings.post</code></td></tr>
+      <tr><td>Sync tested under large dataset</td><td><span class="s-unknown">Unknown</span></td><td>No testing documentation or capacity information in spec</td><td>—</td></tr>
+      <tr><td>Impact if offline sync missing</td><td><span class="s-bad">Bad</span></td><td>Critical — field workers lose access to staff assignments and event schedules when connectivity drops. User confirmed offline is required.</td><td>User-supplied context</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 7 — RTM / CHANGE NOTIFICATIONS (10 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>7. Real-time / Change Notifications (RTM) <span class="section-pts">0 / 10 pts</span></h2>
+  <div class="panel warn">User confirmed auto-update is required when event schedules change server-side. No RTM mechanism exists anywhere in the spec.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>RTM transport</td><td><span class="s-bad">Bad</span></td><td>No WebSocket, Server-Sent Events (SSE), or push notification endpoint found. Score: 0/6</td><td>No <code>paths</code> entries with websocket or SSE patterns; no push-related extensions</td></tr>
+      <tr><td>RTM updates available (event types)</td><td><span class="s-bad">Bad</span></td><td>No push event types defined. Mobile clients must poll — no efficient push available for schedule changes, staff assignment updates, or booking confirmations.</td><td>No push schemas or event type definitions in spec</td></tr>
+      <tr><td>RTM data contract matches REST</td><td><span class="s-bad">Bad</span></td><td>Cannot assess — no RTM contract exists. Score: 0/4</td><td>—</td></tr>
+      <tr><td>Reconnect behaviour documented</td><td><span class="s-bad">Bad</span></td><td>Not applicable as no RTM transport exists. No reconnect guidance documented.</td><td>—</td></tr>
+      <tr><td>Event ordering guaranteed</td><td><span class="s-bad">Bad</span></td><td>Not applicable — no event stream exists.</td><td>—</td></tr>
+      <tr><td>RTM tested in staging</td><td><span class="s-unknown">Unknown</span></td><td>Not applicable — no RTM to test. Staging URL exists but no RTM endpoint to validate.</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 8 — ERROR HANDLING & STABILITY (15 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>8. Error Handling &amp; Stability <span class="section-pts">5 / 15 pts</span></h2>
+  <div class="panel warn">Three distinct inline error schemas exist alongside the reusable Error component — mobile clients cannot parse errors reliably. POST /bookings has no idempotency mechanism and is used in automated flows.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Consistent error response schema</td><td><span class="s-warn">Warn</span></td><td>Inconsistent. 400 on GET /events uses reusable <code>Error</code> schema (<code>code</code> + <code>message</code>). 401 on GET /events uses inline <code>{message: string}</code>. 404 on GET /events/{id} uses inline <code>{error: string}</code>. 409 on POST /bookings uses inline <code>{message: string}</code>. Four different shapes. Score: 2/5</td><td><code>paths./events.get.responses.400.$ref = Error</code>; <code>paths./events.get.responses.401</code> — inline; <code>paths./events/{id}.get.responses.404</code> — inline; <code>paths./bookings.post.responses.409</code> — inline</td></tr>
+      <tr><td>Machine-readable error codes</td><td><span class="s-bad">Bad</span></td><td>The <code>Error</code> component schema has a <code>code</code> field but it is only used for one error response (400 on GET /events). 401, 404, and 409 responses use inline schemas without a <code>code</code> field — mobile clients cannot reliably parse structured error codes. Score: 0/3</td><td><code>components/schemas/Error.properties.code</code> — used only at <code>paths./events.get.responses.400</code></td></tr>
+      <tr><td>GET endpoints retry-safe</td><td><span class="s-good">Good</span></td><td>All three GET endpoints are idempotent by HTTP method semantics. Score: 2/2</td><td><code>paths./events.get</code>, <code>paths./events/{id}.get</code>, <code>paths./events/{id}/staff.get</code></td></tr>
+      <tr><td>Write endpoints idempotent</td><td><span class="s-bad">Bad</span></td><td>POST /bookings has no <code>Idempotency-Key</code> header defined. A timeout + retry creates a duplicate booking. User confirmed both manual and automated flows — HIGH severity. Score: 0/3</td><td><code>paths./bookings.post</code> — no Idempotency-Key in request headers</td></tr>
+      <tr><td>Idempotency-Key header support</td><td><span class="s-bad">Bad</span></td><td>Not defined anywhere in the spec. No mechanism to detect or prevent duplicate bookings.</td><td>No <code>Idempotency-Key</code> header in any path definition</td></tr>
+      <tr><td>Timeout behaviour documented</td><td><span class="s-unknown">Unknown</span></td><td>Not found in spec. No timeout values or retry guidance defined for any endpoint.</td><td>—</td></tr>
+      <tr><td>Circuit breaker / graceful degradation</td><td><span class="s-unknown">Unknown</span></td><td>Not found in spec. No degraded-mode behaviour documented.</td><td>—</td></tr>
+      <tr><td>4xx vs 5xx correctly distinguished</td><td><span class="s-warn">Warn</span></td><td>4xx responses defined (400, 401, 404, 409). No 5xx responses defined in spec — unclear if server errors are handled correctly. Score: 1/2</td><td>4xx responses at <code>paths./events.get</code>, <code>paths./events/{id}.get</code>, <code>paths./bookings.post</code>; no 5xx defined</td></tr>
+      <tr><td>Error messages safe for display</td><td><span class="s-unknown">Unknown</span></td><td>Error schema has a <code>message</code> field but no examples provided — cannot assess whether messages are safe for user display on mobile.</td><td><code>components/schemas/Error.properties.message</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 9 — RATE LIMITING (8 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>9. Rate Limiting &amp; Throttling <span class="section-pts">0 / 8 pts</span></h2>
+  <div class="panel warn">No rate limiting of any kind is defined. Mobile apps that retry aggressively (e.g. after timeout on booking creation) have no backoff guidance and no way to detect they are being throttled.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Rate limits exist and are documented</td><td><span class="s-bad">Bad</span></td><td>No rate limit values, no <code>x-rateLimit</code> extension, no reference to throttling policy. Score: 0/3</td><td>No rate limit headers or extensions in spec</td></tr>
+      <tr><td>Standard rate limit headers returned</td><td><span class="s-bad">Bad</span></td><td>No <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, or <code>X-RateLimit-Reset</code> response headers defined. Score: 0/3</td><td>No response headers defined on any path</td></tr>
+      <tr><td>429 returned (not silent failure)</td><td><span class="s-bad">Bad</span></td><td>HTTP 429 is not defined as a response on any endpoint. Unclear if the server silently degrades or returns an error under load. Score: 0/2</td><td>No <code>429</code> response codes in any <code>paths</code> entry</td></tr>
+      <tr><td>Retry-After on 429</td><td><span class="s-bad">Bad</span></td><td>No <code>Retry-After</code> header defined anywhere. Mobile clients have no guidance on when to retry after being throttled.</td><td>No <code>Retry-After</code> response headers defined</td></tr>
+      <tr><td>Burst limit defined</td><td><span class="s-unknown">Unknown</span></td><td>Not found in spec</td><td>—</td></tr>
+      <tr><td>Backoff guidance published</td><td><span class="s-bad">Bad</span></td><td>No backoff guidance. Particularly critical given POST /bookings has no idempotency — aggressive retries could create duplicate bookings.</td><td>No <code>externalDocs</code> or retry guidance in spec</td></tr>
+      <tr><td>Limits sufficient for mobile usage</td><td><span class="s-unknown">Unknown</span></td><td>Cannot assess — no limits defined</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 10 — SECURITY (10 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>10. Security <span class="section-pts">6 / 10 pts</span></h2>
+  <div class="panel warn">JWT Bearer auth and HTTPS are in place — good foundation. However, no scopes restrict access to sensitive fields, token refresh is undocumented, and multiple sensitive data fields (hourly_rate, billing_code, internal_notes) are exposed to all authenticated clients.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Authentication method</td><td><span class="s-good">Good</span></td><td>JWT Bearer token. Applied globally via <code>security: [{bearerAuth: []}]</code>. Score: 4/4</td><td><code>components/securitySchemes/bearerAuth.type = "http"</code>; <code>.scheme = "bearer"</code>; <code>.bearerFormat = "JWT"</code></td></tr>
+      <tr><td>Token refresh documented</td><td><span class="s-bad">Bad</span></td><td>No token refresh endpoint, no refresh token flow, no token expiry guidance. Mobile apps will receive 401s with no documented recovery path. Score: 0/2</td><td>No refresh endpoint in <code>paths</code>; no OAuth2 flow defined in <code>securitySchemes</code></td></tr>
+      <tr><td>Token expiry / 401 behaviour</td><td><span class="s-unknown">Unknown</span></td><td>401 response is defined but as a generic <code>{message: string}</code> — no distinction between expired token, invalid token, or insufficient permissions.</td><td><code>paths./events.get.responses.401</code> — inline schema, no error code</td></tr>
+      <tr><td>Scopes / permissions required</td><td><span class="s-bad">Bad</span></td><td>The <code>bearerAuth</code> scheme uses HTTP Bearer (not OAuth2) — no scopes are defined or enforced. All authenticated clients can access all endpoints including sensitive staff and booking data.</td><td><code>components/securitySchemes/bearerAuth.type = "http"</code> — no OAuth2 flow, no scopes</td></tr>
+      <tr><td>Principle of least privilege</td><td><span class="s-bad">Bad</span></td><td>No scope granularity. A read-only mobile field-worker session has the same access as an admin. <code>billing_code</code>, <code>hourly_rate</code>, <code>internal_notes</code>, and account manager contacts are returned to all authenticated callers. Score: 0/2</td><td><code>security: [{bearerAuth: []}]</code> — global, no scope differentiation</td></tr>
+      <tr><td>HTTPS enforced</td><td><span class="s-good">Good</span></td><td>Both server URLs use HTTPS. Score: 1/1</td><td><code>servers[0].url = "https://api.acme.com/v2"</code>; <code>servers[1].url = "https://api-staging.acme.com/v2"</code></td></tr>
+      <tr><td>PII in response body</td><td><span class="s-bad">Bad</span></td><td>Multiple PII and sensitive fields returned to all authenticated clients: <code>account_manager_email</code>, <code>account_manager_phone</code> (Event); <code>email</code>, <code>phone</code>, <code>hourly_rate</code> (StaffMember). No field-level access control or scoping.</td><td><code>components/schemas/Event.properties.account_manager_email</code>; <code>components/schemas/StaffMember.properties.hourly_rate</code></td></tr>
+      <tr><td>Sensitive data in URL params</td><td><span class="s-good">Good</span></td><td>No tokens, PII, or sensitive values in query parameters. Score: 1/1</td><td><code>paths./events.get.parameters</code> — only <code>offset</code>, <code>limit</code>, <code>venue_id</code></td></tr>
+      <tr><td>Mobile-specific risks</td><td><span class="s-bad">Bad</span></td><td>JWT stored on device with no refresh mechanism — once expired, user must re-authenticate with no recovery flow. Combined with offline requirement, this creates a hard failure: offline cached data may be useable but any re-auth attempt will fail without connectivity.</td><td>Inferred from lack of refresh flow and offline requirement</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 11 — LOCALISATION & i18n
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>11. Localisation &amp; i18n</h2>
+  <div class="panel warn">User confirmed multiple locales are required. The API has no locale support — no Accept-Language handling, no locale parameters, and date/time fields use RFC 3339 without timezone context.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Localisation support</td><td><span class="s-bad">Bad</span></td><td>None found. User confirmed multiple locales required but no locale mechanism exists in the API.</td><td>No <code>locale</code>, <code>lang</code>, or <code>language</code> params in any path</td></tr>
+      <tr><td>Locale input method</td><td><span class="s-bad">Bad</span></td><td>No <code>Accept-Language</code> header handling, no <code>locale</code> query parameter, and no locale-specific server URLs.</td><td>No locale parameters in any path definition</td></tr>
+      <tr><td>Locale-aware date formatting</td><td><span class="s-warn">Warn</span></td><td>Date fields (<code>start_time</code>, <code>end_time</code>, <code>created_at</code>, <code>updated_at</code>) use RFC 3339 / ISO 8601 format — machine-parseable and locale-neutral, so the mobile app can format locally. This is the correct pattern, but it must be applied client-side.</td><td><code>components/schemas/Event.properties.start_time.format = "date-time"</code></td></tr>
+      <tr><td>Locale-aware currency formatting</td><td><span class="s-bad">Bad</span></td><td><code>hourly_rate</code> is a raw number with no currency code or symbol — the mobile app cannot display this correctly across locales.</td><td><code>components/schemas/StaffMember.properties.hourly_rate.type = "number"</code> — no currency field</td></tr>
+      <tr><td>RTL text supported</td><td><span class="s-unknown">Unknown</span></td><td>Cannot assess from spec — no locale information available</td><td>—</td></tr>
+      <tr><td>Supported locales</td><td><span class="s-unknown">Unknown</span></td><td>Not documented anywhere in the spec</td><td>—</td></tr>
+      <tr><td>Fallback locale behaviour</td><td><span class="s-unknown">Unknown</span></td><td>Not documented — no locale handling exists to have a fallback for</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 12 — VERSIONING & DEPRECATION (6 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>12. Versioning &amp; Deprecation <span class="section-pts">3 / 6 pts</span></h2>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Versioning strategy</td><td><span class="s-good">Good</span></td><td>URL path versioning in use — <code>/v2</code> prefix on all server URLs. Clear and mobile-friendly. Score: 3/3</td><td><code>servers[0].url = "https://api.acme.com/v2"</code></td></tr>
+      <tr><td>Backward-compatible change policy</td><td><span class="s-unknown">Unknown</span></td><td>Not documented — no change policy in spec or externalDocs</td><td>—</td></tr>
+      <tr><td>Deprecation notice period</td><td><span class="s-bad">Bad</span></td><td>Not defined. No per-operation <code>deprecated: true</code> marker, no deprecation policy. Score: 0/2</td><td>No <code>deprecated</code> fields in any operation</td></tr>
+      <tr><td>Sunset header used</td><td><span class="s-bad">Bad</span></td><td>No <code>Sunset</code> response header defined on any endpoint</td><td>No <code>Sunset</code> headers in any path response definition</td></tr>
+      <tr><td>Old versions still supported</td><td><span class="s-unknown">Unknown</span></td><td>Only v2 server defined — v1 support status unknown</td><td><code>servers</code> — only v2 URLs present</td></tr>
+      <tr><td>Changelog maintained</td><td><span class="s-bad">Bad</span></td><td>No changelog link, no <code>externalDocs</code>, no <code>x-changelog</code> extension. Score: 0/1</td><td>No <code>externalDocs</code> in spec</td></tr>
+      <tr><td>Mobile team notified of changes</td><td><span class="s-unknown">Unknown</span></td><td>No process documented — not determinable from spec alone</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 13 — TESTING & MOCK AVAILABILITY (5 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>13. Testing &amp; Mock Availability <span class="section-pts">3 / 5 pts</span></h2>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>OpenAPI spec current and complete</td><td><span class="s-warn">Warn</span></td><td>Spec covers all 4 endpoints but is incomplete — no property descriptions, no examples, inconsistent error schemas, no response headers defined. Score: 1/2</td><td>All paths present; missing <code>description</code> on properties; inconsistent error responses</td></tr>
+      <tr><td>Sandbox / staging environment</td><td><span class="s-good">Good</span></td><td>Staging server defined: <code>https://api-staging.acme.com/v2</code>. Score: 2/2</td><td><code>servers[1].url = "https://api-staging.acme.com/v2"</code>; <code>servers[1].description = "Staging"</code></td></tr>
+      <tr><td>Mock server available</td><td><span class="s-unknown">Unknown</span></td><td>Not referenced in spec. No <code>x-mock-url</code> or mock server extension.</td><td>—</td></tr>
+      <tr><td>Representative test data</td><td><span class="s-bad">Bad</span></td><td>No <code>example</code> or <code>examples</code> fields on any schema property or response</td><td>No <code>example</code> fields in <code>components/schemas</code></td></tr>
+      <tr><td>Contract tests in CI</td><td><span class="s-unknown">Unknown</span></td><td>No <code>x-</code> extensions referencing contract tests or CI pipeline</td><td>—</td></tr>
+      <tr><td>Consumer-driven contract tests</td><td><span class="s-bad">Bad</span></td><td>Not found. Score: 0/1</td><td>No PACT or contract test references in spec</td></tr>
+      <tr><td>Postman / Bruno collection</td><td><span class="s-unknown">Unknown</span></td><td>Not referenced in spec</td><td>—</td></tr>
+      <tr><td>Known staging limitations</td><td><span class="s-unknown">Unknown</span></td><td>Not documented</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 14 — MONITORING & OBSERVABILITY (4 pts)
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>14. Monitoring &amp; Observability <span class="section-pts">0 / 4 pts</span></h2>
+  <div class="panel note">Nothing observable from the spec — no request IDs, no SLA, no health endpoint. Zero points in this dimension.</div>
+  <table>
+    <thead><tr><th style="width:26%">Criterion</th><th style="width:22%">Status</th><th>Notes</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Request ID returned in responses</td><td><span class="s-bad">Bad</span></td><td>No <code>X-Request-Id</code> or <code>X-Trace-Id</code> response headers defined. Mobile teams cannot correlate client-side errors with server logs. Score: 0/2</td><td>No response headers defined on any path</td></tr>
+      <tr><td>Latency dashboard exists</td><td><span class="s-unknown">Unknown</span></td><td>Not referenced in spec</td><td>—</td></tr>
+      <tr><td>Error rate dashboard exists</td><td><span class="s-unknown">Unknown</span></td><td>Not referenced in spec</td><td>—</td></tr>
+      <tr><td>Alerting configured</td><td><span class="s-unknown">Unknown</span></td><td>Not referenced in spec</td><td>—</td></tr>
+      <tr><td>SLA / SLO defined</td><td><span class="s-bad">Bad</span></td><td>No SLA, SLO, or availability target referenced anywhere in the spec. Score: 0/1</td><td>No <code>x-sla</code> extension or <code>externalDocs</code></td></tr>
+      <tr><td>Distributed tracing available</td><td><span class="s-unknown">Unknown</span></td><td>Not found in spec</td><td>—</td></tr>
+      <tr><td>Mobile-specific metrics</td><td><span class="s-unknown">Unknown</span></td><td>Not found in spec</td><td>—</td></tr>
+      <tr><td>Incident history / status page</td><td><span class="s-unknown">Unknown</span></td><td>Not referenced in spec</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 15 — KNOWN ISSUES
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>15. Known Issues</h2>
+  <div class="panel warn">15 confirmed issues with direct evidence. Each deducts 2 points. Raw score: 24 &minus; 30 = &minus;6, floored to 0.</div>
+  <table>
+    <thead><tr><th style="width:40%">Issue</th><th style="width:14%">Severity</th><th>Impact / Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>No Idempotency-Key on POST /bookings</td>
+        <td><span class="sev-high">High</span></td>
+        <td>User confirmed both manual and automated flows. A network timeout + retry silently creates a duplicate booking. No mitigation exists. Evidence: <code>paths./bookings.post</code> — no Idempotency-Key header defined.</td>
+      </tr>
+      <tr>
+        <td>No offline sync mechanism</td>
+        <td><span class="sev-high">High</span></td>
+        <td>User confirmed offline is required for field workers. No delta sync param (<code>updated_since</code>), no full-sync endpoint, no ETag. App cannot function offline. Evidence: no filter params beyond <code>offset</code>/<code>limit</code>/<code>venue_id</code>.</td>
+      </tr>
+      <tr>
+        <td>No tombstones / deleted record signalling</td>
+        <td><span class="sev-high">High</span></td>
+        <td>With offline required, mobile clients that cache data have no way to detect server-side deletions. Stale deleted records will persist in the app indefinitely. Evidence: no <code>deleted_at</code> or <code>is_deleted</code> in any schema.</td>
+      </tr>
+      <tr>
+        <td>No RTM / push mechanism</td>
+        <td><span class="sev-high">High</span></td>
+        <td>User confirmed auto-update is required when schedules change. No WebSocket, SSE, or push endpoint exists. Clients must poll — inefficient and battery-draining on mobile. Evidence: no push paths in spec.</td>
+      </tr>
+      <tr>
+        <td>No HTTP cache headers (Cache-Control, ETag)</td>
+        <td><span class="sev-high">High</span></td>
+        <td>All requests hit origin with no caching. Combined with offline requirement, there is no defined caching contract. Evidence: no response headers defined on any path.</td>
+      </tr>
+      <tr>
+        <td>PII and sensitive data exposure</td>
+        <td><span class="sev-high">High</span></td>
+        <td>Event returns <code>billing_code</code>, <code>internal_notes</code>, <code>account_manager_email</code>, <code>account_manager_phone</code> to all authenticated clients. StaffMember returns <code>hourly_rate</code>. No scopes restrict access. Evidence: <code>components/schemas/Event</code>, <code>components/schemas/StaffMember</code>.</td>
+      </tr>
+      <tr>
+        <td>No pagination on GET /events/{id}/staff</td>
+        <td><span class="sev-high">High</span></td>
+        <td>The staff list endpoint returns an unbounded array. A large event could return hundreds of staff members in a single response — no way to page. Evidence: <code>paths./events/{id}/staff.get</code> — no <code>limit</code> or <code>offset</code> params.</td>
+      </tr>
+      <tr>
+        <td>Inconsistent error response schema</td>
+        <td><span class="sev-med">Med</span></td>
+        <td>Four different error shapes across four endpoints. Mobile error handling code cannot rely on a consistent structure. Evidence: 400 → <code>Error</code> (code+message), 401 → inline (message), 404 → inline (error), 409 → inline (message).</td>
+      </tr>
+      <tr>
+        <td>Rate limits undocumented</td>
+        <td><span class="sev-med">Med</span></td>
+        <td>No rate limit values, headers, or 429 response defined. Mobile apps have no way to implement backoff. Especially dangerous combined with no idempotency on POST /bookings. Evidence: no <code>X-RateLimit-*</code> or 429 in spec.</td>
+      </tr>
+      <tr>
+        <td>No Retry-After on 429</td>
+        <td><span class="sev-med">Med</span></td>
+        <td>No <code>Retry-After</code> header defined. Even if rate limiting is implemented server-side, clients have no retry guidance. Evidence: no response headers defined on any path.</td>
+      </tr>
+      <tr>
+        <td>Token refresh not documented</td>
+        <td><span class="sev-med">Med</span></td>
+        <td>No refresh token flow or token expiry guidance. Mobile sessions will fail silently on expiry with no documented recovery path. Evidence: <code>bearerAuth</code> uses HTTP Bearer type, no OAuth2 flow.</td>
+      </tr>
+      <tr>
+        <td>No scopes / over-broad permissions</td>
+        <td><span class="sev-med">Med</span></td>
+        <td>Single global JWT grants access to all endpoints including sensitive staff financial data. No least-privilege model for mobile read-only consumers. Evidence: <code>security: [{bearerAuth: []}]</code> — no scopes.</td>
+      </tr>
+      <tr>
+        <td>Localisation gaps (multiple locales required)</td>
+        <td><span class="sev-med">Med</span></td>
+        <td>User confirmed multiple locales needed. No <code>Accept-Language</code> handling, no locale param, and <code>hourly_rate</code> has no currency code. Evidence: no locale params in any path; <code>StaffMember.hourly_rate</code> is a bare number.</td>
+      </tr>
+      <tr>
+        <td>Offset pagination on GET /events (not cursor)</td>
+        <td><span class="sev-med">Med</span></td>
+        <td>Offset pagination drifts when records are inserted between pages — mobile list views will show duplicates or skip items during live sync. Evidence: <code>paths./events.get.parameters[0].name = "offset"</code>.</td>
+      </tr>
+      <tr>
+        <td>No deprecation / sunset policy</td>
+        <td><span class="sev-low">Low</span></td>
+        <td>No <code>Sunset</code> header, no <code>deprecated: true</code> markers, no changelog. Mobile apps ship on long release cycles — lack of deprecation notice risks breaking deployed clients. Evidence: no deprecation fields in spec.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 16 — PROPOSED IMPROVEMENTS
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>16. Proposed Improvements</h2>
+  <table>
+    <thead><tr><th style="width:40%">Improvement</th><th style="width:14%">Priority</th><th>Reasoning</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Add <code>Idempotency-Key</code> header to POST /bookings</td>
+        <td><span class="pri-high">High</span></td>
+        <td>Blocks mobile shipment for automated booking flows. Client generates a UUID per booking attempt; server deduplicates on key. Prevents duplicate bookings on retry.</td>
+      </tr>
+      <tr>
+        <td>Add delta sync support — <code>updated_since</code> param to GET /events and GET /events/{id}/staff</td>
+        <td><span class="pri-high">High</span></td>
+        <td>Required for offline. ISO 8601 timestamp param filters events/staff modified after a given time. <code>updated_at</code> is already in the Event schema — just expose it as a filter.</td>
+      </tr>
+      <tr>
+        <td>Add tombstones — <code>deleted_at</code> field to Event, StaffMember, and Booking schemas</td>
+        <td><span class="pri-high">High</span></td>
+        <td>Required for offline correctness. Without tombstones, cached data never ages out. Soft-delete pattern: mark records as deleted but return them in delta sync responses.</td>
+      </tr>
+      <tr>
+        <td>Add WebSocket or SSE endpoint for schedule change notifications</td>
+        <td><span class="pri-high">High</span></td>
+        <td>Required for auto-update. Minimum viable: SSE stream for event schedule changes and staff assignment updates. Reduces polling load and enables immediate update on mobile.</td>
+      </tr>
+      <tr>
+        <td>Add Cache-Control and ETag response headers</td>
+        <td><span class="pri-high">High</span></td>
+        <td>Enables client-side and CDN caching. Minimum: <code>Cache-Control: max-age=60</code> on GET /events, <code>ETag</code> on GET /events/{id}. Significantly reduces repeat-request latency on mobile.</td>
+      </tr>
+      <tr>
+        <td>Remove or scope sensitive fields (billing_code, internal_notes, account_manager_*, hourly_rate)</td>
+        <td><span class="pri-high">High</span></td>
+        <td>PII and financial data must not be returned to field-worker mobile clients. Either define OAuth2 scopes (e.g. <code>events:admin</code>) or create a mobile-specific response projection that omits these fields.</td>
+      </tr>
+      <tr>
+        <td>Add pagination to GET /events/{id}/staff</td>
+        <td><span class="pri-high">High</span></td>
+        <td>Unbounded array is a reliability risk. Add <code>limit</code> (default 20, max 100) and a cursor param. Prevents large staff events from causing oversized mobile payloads.</td>
+      </tr>
+      <tr>
+        <td>Standardise error schema across all endpoints</td>
+        <td><span class="pri-med">Med</span></td>
+        <td>Replace all inline error schemas with <code>$ref: Error</code>. Add <code>request_id</code> to the Error schema to enable client-server log correlation. Apply consistently to 401, 404, 409, and 5xx responses.</td>
+      </tr>
+      <tr>
+        <td>Define and document rate limits with <code>X-RateLimit-*</code> headers and 429 response</td>
+        <td><span class="pri-med">Med</span></td>
+        <td>Add rate limit response headers to all endpoints and define a 429 response with <code>Retry-After</code>. Publish limits in spec via <code>x-rateLimit</code> extension. Prevents mobile apps from hammering the API on failure.</td>
+      </tr>
+      <tr>
+        <td>Document token refresh flow</td>
+        <td><span class="pri-med">Med</span></td>
+        <td>Add a token refresh endpoint or migrate to OAuth2 with a defined refresh_token flow. Document token expiry time and 401 sub-codes so mobile apps can distinguish expired vs invalid tokens.</td>
+      </tr>
+      <tr>
+        <td>Define OAuth2 scopes for least-privilege access</td>
+        <td><span class="pri-med">Med</span></td>
+        <td>Migrate <code>bearerAuth</code> to OAuth2. Define minimal scopes: e.g. <code>events:read</code>, <code>staff:read</code>, <code>bookings:write</code>. Restrict admin fields to <code>events:admin</code> scope.</td>
+      </tr>
+      <tr>
+        <td>Add locale support — <code>Accept-Language</code> header or <code>locale</code> param</td>
+        <td><span class="pri-med">Med</span></td>
+        <td>For multi-locale deployment: accept <code>Accept-Language</code> header and return locale-appropriate content where applicable. Add <code>currency_code</code> field alongside <code>hourly_rate</code> in StaffMember.</td>
+      </tr>
+      <tr>
+        <td>Migrate pagination to cursor-based on GET /events</td>
+        <td><span class="pri-med">Med</span></td>
+        <td>Replace <code>offset</code>/<code>limit</code> with <code>cursor</code>/<code>limit</code>. Return an opaque <code>next_cursor</code> in the response. Eliminates page-drift on live data and enables efficient delta sync when combined with <code>updated_since</code>.</td>
+      </tr>
+      <tr>
+        <td>Add deprecation/sunset policy and Sunset response header</td>
+        <td><span class="pri-low">Low</span></td>
+        <td>Define a minimum notice period (e.g. 12 months) for breaking changes. Add <code>Sunset</code> response header to endpoints approaching end-of-life. Add <code>externalDocs</code> link to changelog.</td>
+      </tr>
+      <tr>
+        <td>Add X-Request-Id to all responses and define SLA</td>
+        <td><span class="pri-low">Low</span></td>
+        <td>Add <code>X-Request-Id</code> response header (or <code>request_id</code> in error body) to enable mobile-server log correlation. Document latency SLOs in spec externalDocs.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SECTION 17 — FINAL VERDICT
+═══════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>17. Final Verdict</h2>
+
+  <table style="margin-bottom:16px;">
+    <thead><tr><th style="width:30%">Metric</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Raw score</td><td>24 / 100</td></tr>
+      <tr><td>Confirmed known issues</td><td>15</td></tr>
+      <tr><td>Deductions</td><td>−30 (15 &times; 2)</td></tr>
+      <tr><td>Adjusted score</td><td>0 / 100 (floored from −6)</td></tr>
+      <tr><td>Score band</td><td>0–49 = Not mobile-ready</td></tr>
+      <tr><td><strong>Verdict</strong></td><td><strong><span class="sev-high">Not mobile-ready</span></strong></td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-bottom:16px;"><strong>Top 3 risks:</strong></div>
+  <div class="top-risks">
+    <div class="risk-item">
+      <span class="risk-num">1</span>
+      <div>
+        <strong>Data integrity collapse under offline + retry conditions.</strong>
+        The combination of no idempotency on POST /bookings (used in automated flows), no offline sync mechanism, and no tombstones means duplicate bookings and stale cached data are both near-certain in normal field usage. These are not edge cases — they are the primary usage scenario.
+      </div>
+    </div>
+    <div class="risk-item">
+      <span class="risk-num">2</span>
+      <div>
+        <strong>Sensitive data exposure to all authenticated mobile clients.</strong>
+        <code>billing_code</code>, <code>internal_notes</code>, <code>account_manager_email/phone</code>, and staff <code>hourly_rate</code> are returned to every authenticated caller with no scope restrictions. This is a compliance and data-protection risk in a multi-locale, field-worker deployment.
+      </div>
+    </div>
+    <div class="risk-item">
+      <span class="risk-num">3</span>
+      <div>
+        <strong>No real-time update mechanism where auto-update is required.</strong>
+        User confirmed schedule changes must propagate automatically to the mobile app. No WebSocket, SSE, or push endpoint exists. Polling is the only option — battery-intensive, latency-prone, and incompatible with the offline requirement.
+      </div>
+    </div>
+  </div>
+
+  <table style="margin-top:16px;">
+    <thead><tr><th style="width:30%">Engineering recommendation</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Do not ship to mobile consumers in current state.</strong></td>
+        <td>The API lacks the foundational building blocks required for reliable mobile operation: no idempotency, no caching contract, no sync mechanism, no RTM, and sensitive data exposed without scoping. These are not optimisation gaps — they are correctness and safety gaps.</td>
+      </tr>
+      <tr>
+        <td>Conditions for re-evaluation</td>
+        <td>
+          Minimum gate to re-evaluate (all must be addressed):<br>
+          &bull; <code>Idempotency-Key</code> added to POST /bookings<br>
+          &bull; <code>updated_since</code> filter added to GET /events and GET /events/{id}/staff<br>
+          &bull; Tombstone field (<code>deleted_at</code>) added to Event and StaffMember<br>
+          &bull; Sensitive fields removed from mobile response or gated behind a scope<br>
+          &bull; Pagination added to GET /events/{id}/staff<br>
+          &bull; Cache-Control headers added to GET endpoints
+        </td>
+      </tr>
+      <tr>
+        <td>Recommended next step</td>
+        <td>Schedule a mobile API design review with the platform team. Use this report's Proposed Improvements section as the backlog input. Re-run this audit after the minimum gate items are resolved.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<div style="padding: 24px 32px; border-top: 1px solid var(--border); margin-top: 24px; color: var(--text-hint); font-size: 12px;">
+  Generated by mobile-api-audit skill &middot; Input: acme-events-api.yaml (OpenAPI 3.0.3) &middot; Date: 2026-05-02 &middot; Consumer context: Mobile field workers, offline required, multi-locale, auto-update needed
+</div>
+
+</div><!-- #content -->
+
+<script>
+function selectContent() {
+  const el = document.getElementById('content');
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+</script>
+</body>
+</html>

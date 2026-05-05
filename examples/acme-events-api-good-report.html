@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile API Readiness Report — Acme Events API (Good)</title>
+  <style>
+    :root {
+      --text: #172B4D; --text-mid: #42526E; --text-sub: #6B778C; --text-hint: #97A0AF;
+      --surface: #F4F5F7; --border: #DFE1E6;
+      --green-bg: #E3FCEF; --green-txt: #006644;
+      --yellow-bg: #FFFAE6; --yellow-txt: #974F0C;
+      --red-bg: #FFEBE6; --red-txt: #BF2600;
+      --blue-bg: #DEEBFF; --blue-txt: #0747A6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; color: var(--text); background: #fff; }
+    .copy-bar { position: fixed; top: 0; left: 0; right: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; z-index: 100; font-size: 13px; color: var(--text-mid); }
+    .copy-bar button { background: var(--text); color: #fff; border: none; border-radius: 4px; padding: 5px 12px; cursor: pointer; font-size: 13px; }
+    #content { max-width: 1100px; margin: 56px auto 40px; padding: 24px; }
+    .header { margin-bottom: 20px; }
+    .header h1 { font-size: 22px; font-weight: 700; }
+    .header .subtitle { font-size: 17px; font-weight: 600; color: var(--text-mid); margin-top: 2px; }
+    .header .meta { font-size: 13px; color: var(--text-sub); margin-top: 6px; }
+    .header .meta span { margin-right: 20px; }
+    .score-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; display: grid; grid-template-columns: 170px 1fr; gap: 24px; align-items: start; }
+    .score-display { text-align: center; }
+    .score-num { font-size: 52px; font-weight: 800; line-height: 1; }
+    .score-denom { font-size: 22px; color: var(--text-sub); }
+    .score-note { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+    .score-deduct { font-size: 12px; color: var(--red-txt); margin-top: 4px; }
+    .verdict-box { margin-top: 12px; }
+    .verdict { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+    .verdict.good { background: var(--green-bg); color: var(--green-txt); }
+    .verdict.warn { background: var(--yellow-bg); color: var(--yellow-txt); }
+    .verdict.bad { background: var(--red-bg); color: var(--red-txt); }
+    .blocker-note { font-size: 11px; color: var(--red-txt); margin-top: 6px; }
+    .dim-row { display: grid; grid-template-columns: 210px 1fr 55px; gap: 8px; align-items: center; margin-bottom: 7px; font-size: 13px; }
+    .dim-name { color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-track { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 5px; }
+    .bar-green { background: #10B981; }
+    .bar-amber { background: #F59E0B; }
+    .bar-red { background: #EF4444; }
+    .dim-pts { font-size: 12px; color: var(--text-sub); text-align: right; }
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 15px; font-weight: 700; border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+    .pts-badge { font-size: 12px; font-weight: 400; color: var(--text-sub); }
+    .panel { padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; font-size: 13px; border-left: 4px solid; line-height: 1.5; }
+    .panel.info { background: var(--blue-bg); border-color: #4C9AFF; color: var(--blue-txt); }
+    .panel.tip { background: var(--green-bg); border-color: #57D9A3; color: var(--green-txt); }
+    .panel.warn { background: var(--yellow-bg); border-color: #FFB94C; color: var(--yellow-txt); }
+    .panel.note { background: var(--surface); border-color: var(--text-hint); color: var(--text-mid); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 4px; }
+    th { background: var(--surface); font-weight: 600; text-align: left; padding: 8px 12px; border: 1px solid var(--border); color: var(--text-mid); }
+    td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+    tr:nth-child(even) td { background: #FAFBFC; }
+    .col-c { width: 24%; font-weight: 500; }
+    .col-s { width: 20%; }
+    .col-e { font-size: 11px; color: var(--text-hint); font-family: monospace; width: 26%; word-break: break-all; }
+    .s-good, .s-warn, .s-bad, .s-na, .s-unknown { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .s-good { background: var(--green-bg); color: var(--green-txt); }
+    .s-warn { background: var(--yellow-bg); color: var(--yellow-txt); }
+    .s-bad { background: var(--red-bg); color: var(--red-txt); }
+    .s-na { background: var(--surface); color: var(--text-sub); }
+    .s-unknown { background: var(--surface); color: var(--text-hint); }
+    code { font-family: monospace; font-size: 12px; background: #F4F5F7; padding: 1px 4px; border-radius: 3px; }
+    .sev-critical { color: var(--red-txt); font-weight: 700; }
+    .sev-major { color: #974F0C; font-weight: 600; }
+    .sev-minor { color: var(--text-mid); }
+    @media print { .copy-bar { display: none; } #content { margin-top: 0; } }
+  </style>
+</head>
+<body>
+
+<div class="copy-bar">
+  <span>Open in browser → <strong>Select all</strong> (Cmd/Ctrl+A) → Copy → Paste into Confluence</span>
+  <button onclick="selectContent()">Select all</button>
+</div>
+
+<div id="content">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="subtitle">Mobile API Readiness Report</div>
+  <h1>Acme Events API (Good)</h1>
+  <div class="meta">
+    <span>Consumers: iOS app, Android app</span>
+    <span>Audit date: 2026-05-04</span>
+    <span>Input: HAR capture · 10 entries · production</span>
+    <span>Confidence: Medium (HAR only)</span>
+  </div>
+</div>
+
+<!-- SCORE PANEL -->
+<div class="score-panel">
+  <div class="score-display">
+    <div><span class="score-num" style="color:#974F0C">67</span><span class="score-denom">/100</span></div>
+    <div class="score-note">75 earned − 8 deductions</div>
+    <div class="score-deduct">−8 pts (2 major × 3, 2 minor × 1)</div>
+    <div class="verdict-box"><span class="verdict warn">Ready with changes</span></div>
+    <div class="blocker-note">Blocker: OAuth2 without PKCE<br>caps at Ready with changes</div>
+  </div>
+  <div>
+    <div class="dim-row"><span class="dim-name">Performance &amp; scalability</span><div class="bar-track"><div class="bar-fill bar-green" style="width:80%"></div></div><span class="dim-pts">16/20</span></div>
+    <div class="dim-row"><span class="dim-name">Error handling &amp; stability</span><div class="bar-track"><div class="bar-fill bar-green" style="width:93%"></div></div><span class="dim-pts">14/15</span></div>
+    <div class="dim-row"><span class="dim-name">Offline sync</span><div class="bar-track"><div class="bar-fill bar-green" style="width:100%"></div></div><span class="dim-pts">12/12</span></div>
+    <div class="dim-row"><span class="dim-name">Caching &amp; payload</span><div class="bar-track"><div class="bar-fill bar-green" style="width:100%"></div></div><span class="dim-pts">10/10</span></div>
+    <div class="dim-row"><span class="dim-name">Real-time / RTM</span><div class="bar-track"><div class="bar-fill bar-red" style="width:0%"></div></div><span class="dim-pts">0/10</span></div>
+    <div class="dim-row"><span class="dim-name">Security</span><div class="bar-track"><div class="bar-fill bar-green" style="width:90%"></div></div><span class="dim-pts">9/10</span></div>
+    <div class="dim-row"><span class="dim-name">Rate limiting</span><div class="bar-track"><div class="bar-fill bar-green" style="width:100%"></div></div><span class="dim-pts">8/8</span></div>
+    <div class="dim-row"><span class="dim-name">Versioning &amp; deprecation</span><div class="bar-track"><div class="bar-fill bar-amber" style="width:50%"></div></div><span class="dim-pts">3/6</span></div>
+    <div class="dim-row"><span class="dim-name">Testing &amp; mocks</span><div class="bar-track"><div class="bar-fill bar-red" style="width:0%"></div></div><span class="dim-pts">0/5</span></div>
+    <div class="dim-row"><span class="dim-name">Observability</span><div class="bar-track"><div class="bar-fill bar-green" style="width:75%"></div></div><span class="dim-pts">3/4</span></div>
+  </div>
+</div>
+
+<div class="panel note"><strong>Audit coverage: HAR only.</strong> No OpenAPI spec was provided. Testing &amp; mocks scores 0 by default. Deprecation policy, changelog, and sandbox cannot be confirmed from traffic alone. Providing a spec alongside this HAR would raise coverage to High and may recover up to 5 pts.</div>
+
+<!-- SECTION 1 -->
+<div class="section">
+  <h2>1. API Overview</h2>
+  <table>
+    <thead><tr><th style="width:30%">Field</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td class="col-c">API name</td><td>Acme Events API (Good)</td></tr>
+      <tr><td class="col-c">Endpoint(s)</td><td><code>GET /v3/events</code> · <code>GET /v3/events/{id}</code> · <code>POST /v3/bookings</code> · <code>GET /v3/health</code> · <code>POST auth.acme.com/oauth/token</code></td></tr>
+      <tr><td class="col-c">Functional purpose</td><td>Event listing, detail, delta sync, and booking creation for mobile field workers and coordinators</td></tr>
+      <tr><td class="col-c">Primary consumer(s)</td><td>iOS app, Android app (confirmed: <code>X-Platform: iOS</code>, <code>X-App-Version: 4.2.1</code>)</td></tr>
+      <tr><td class="col-c">Data domain</td><td>Events, Bookings</td></tr>
+      <tr><td class="col-c">Team / owner</td><td>Not found in input</td></tr>
+      <tr><td class="col-c">Current version</td><td>v3 (URL path) · build <code>3.4.1</code> (health endpoint body)</td></tr>
+      <tr><td class="col-c">OpenAPI spec</td><td>Not provided — HAR-only audit</td></tr>
+      <tr><td class="col-c">Staging / sandbox URL</td><td>Not found in input</td></tr>
+      <tr><td class="col-c">Runbook / documentation</td><td>Not found in input</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 2 -->
+<div class="section">
+  <h2>2. Data Characteristics</h2>
+  <table>
+    <thead><tr><th style="width:30%">Field</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td class="col-c">Response type</td><td>Mixed — list collections, single resource detail, write confirmation (201 Created)</td></tr>
+      <tr><td class="col-c">Typical payload size (p50)</td><td>210 bytes (~0.2 KB) — computed from 9 response bodies (304 entry excluded)</td></tr>
+      <tr><td class="col-c">P95 payload size</td><td>~740 bytes (~0.7 KB) — well under 200 KB threshold; no bloated payloads</td></tr>
+      <tr><td class="col-c">Max records per response</td><td>20 (from <code>limit=20</code> query param)</td></tr>
+      <tr><td class="col-c">Data sensitivity</td><td>Staff IDs, booking notes free text (<code>"VIP client — priority setup"</code>), event names and timestamps. No email/phone/address in observed responses. Notes field could carry PII depending on usage.</td></tr>
+      <tr><td class="col-c">Schema formally documented</td><td>Not provided — no OpenAPI spec submitted</td></tr>
+      <tr><td class="col-c">Schema stability</td><td><span class="s-unknown">Unknown</span> — Requires manual input; cannot be inferred from HAR</td></tr>
+      <tr><td class="col-c">API dependency chain</td><td><span class="s-unknown">Unknown</span> — Requires manual input; cannot be inferred from HAR</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 3 -->
+<div class="section">
+  <h2>3. Mobile Usage Patterns</h2>
+  <div class="panel info">HAR session shape: list events → paginate → 304 cache hit → delta sync → create booking (+ idempotent retry) → 429 → 422 validation error → token refresh → health check. Inferred as screen-load + booking creation flow. Standard latency targets applied.</div>
+  <table>
+    <thead><tr><th class="col-c">Pattern</th><th class="col-s">Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="col-c">Called on app launch</td><td><span class="s-good">Likely</span></td><td>Session opens with <code>GET /v3/events</code> list — consistent with on-launch screen population</td></tr>
+      <tr><td class="col-c">Called on every screen load</td><td><span class="s-good">Likely</span></td><td>Events list appears to be a primary screen; cursor pagination and field filtering suggest per-load calls</td></tr>
+      <tr><td class="col-c">Called during foreground transition</td><td><span class="s-good">Likely</span></td><td>Delta sync endpoint (<code>?updated_since=</code>) is suited for foreground-resume polling</td></tr>
+      <tr><td class="col-c">Called in background / silent push</td><td><span class="s-unknown">Possible</span></td><td>Delta sync is background-safe; no push trigger observed in HAR</td></tr>
+      <tr><td class="col-c">Called on user action</td><td><span class="s-good">Confirmed</span></td><td><code>POST /v3/bookings</code> is explicit user-initiated write</td></tr>
+      <tr><td class="col-c">Expected calls per session</td><td><span class="s-unknown">~10 observed</span></td><td>10 requests in HAR: 2× list, 1× detail (304), 1× delta sync, 2× booking, 1× 429, 1× 422, 1× token refresh, 1× health</td></tr>
+      <tr><td class="col-c">Expected concurrent callers</td><td><span class="s-unknown">Unknown</span></td><td>Not found in input. Rate limit of 1,000 req/window observed.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 4 -->
+<div class="section">
+  <h2>4. Performance &amp; Scalability <span class="pts-badge">(16/20 pts)</span></h2>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Pagination type</td>
+        <td><span class="s-good">Cursor-based</span></td>
+        <td>Response includes <code>next_cursor</code> and <code>has_more</code>. Page 2 retrieved via <code>?cursor=cur_eyJpZCI6ImV2dF8wMDIifQ</code>. Terminal page returns <code>next_cursor: null, has_more: false</code>. Scores 8/8.</td>
+        <td class="col-e">entries[1].queryString: cursor=cur_eyJpZCI6ImV2dF8wMDIifQ; entries[0].response: pagination.next_cursor, pagination.has_more</td>
+      </tr>
+      <tr>
+        <td class="col-c">HTTP/2 / connection reuse</td>
+        <td><span class="s-good">HTTP/2 confirmed</span></td>
+        <td>All 10 entries show <code>httpVersion: "HTTP/2"</code> on both request and response. Multiplexing and header compression active. Scores 2/2.</td>
+        <td class="col-e">entries[0–9].request.httpVersion = "HTTP/2"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Batching / bulk endpoint</td>
+        <td><span class="s-bad">Not found</span></td>
+        <td>No batch or multi-resource endpoint observed. List endpoints exist so N/A rule does not apply. Scores 0/4.</td>
+        <td class="col-e">No bulk endpoint in any entries[].request.url</td>
+      </tr>
+      <tr>
+        <td class="col-c">Latency p50</td>
+        <td><span class="s-good">100 ms</span></td>
+        <td>p50 = 100ms across all 10 entries. Well below 150ms threshold. Scores 4/4. Sorted: [22, 28, 45, 55, 98, 102, 118, 135, 145, 188].</td>
+        <td class="col-e">entries[].time → p50 = (98+102)/2 = 100ms</td>
+      </tr>
+      <tr>
+        <td class="col-c">Latency p95</td>
+        <td><span class="s-good">167 ms</span></td>
+        <td>p95 ≈ 167ms. No requests exceed 800ms. Max = 188ms (token refresh at auth.acme.com).</td>
+        <td class="col-e">entries[].time → p95 = 145 + 0.5×(188−145) = 166.5ms</td>
+      </tr>
+      <tr>
+        <td class="col-c">Field filtering / sparse fieldsets</td>
+        <td><span class="s-good">Supported</span></td>
+        <td>App passes <code>?fields=id,name,start_time,end_time,venue_id</code> — server returns exactly those 5 fields. Scores 2/2.</td>
+        <td class="col-e">entries[0].request.queryString: fields=id,name,start_time,end_time,venue_id</td>
+      </tr>
+      <tr>
+        <td class="col-c">Response compression</td>
+        <td><span class="s-good">gzip confirmed</span></td>
+        <td>All API responses carry <code>Content-Encoding: gzip</code>. Client sends <code>Accept-Encoding: gzip, br</code>. Entry 1: 820 bytes → ~430 bytes compressed (~48% reduction). Scored under Caching &amp; payload dimension.</td>
+        <td class="col-e">entries[0].response.headers: Content-Encoding = gzip; size=820, compression=390</td>
+      </tr>
+      <tr>
+        <td class="col-c">Minimal response data</td>
+        <td><span class="s-good">Minimal</span></td>
+        <td>p50 payload = 210 bytes. Field filtering further reduces size. No large embedded arrays observed. Scored under Caching &amp; payload dimension.</td>
+        <td class="col-e">entries[].response.content.size p50 = 210 bytes</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 5 -->
+<div class="section">
+  <h2>5. Caching &amp; Payload Optimisation <span class="pts-badge">(10/10 pts)</span></h2>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Cache-Control header</td>
+        <td><span class="s-good">Present — meaningful</span></td>
+        <td><code>private, max-age=30, stale-while-revalidate=60</code> on list endpoint. <code>private, max-age=10</code> on delta sync. Auth token endpoint correctly uses <code>no-store</code>. Scores 4/4.</td>
+        <td class="col-e">entries[0].response.headers: Cache-Control = private, max-age=30, stale-while-revalidate=60; entries[8].response.headers: Cache-Control = no-store</td>
+      </tr>
+      <tr>
+        <td class="col-c">ETag / Last-Modified</td>
+        <td><span class="s-good">ETag — working</span></td>
+        <td>ETag on list and detail responses. Entry 3 confirms full round-trip: <code>If-None-Match</code> sent → <code>304 Not Modified</code> returned with 0 bytes. Scores 2/2.</td>
+        <td class="col-e">entries[2].request.headers: If-None-Match = "a3f8c2d1e5b7"; entries[2].response.status = 304; entries[2].response.content.size = 0</td>
+      </tr>
+      <tr>
+        <td class="col-c">CDN-cacheable</td>
+        <td><span class="s-warn">Private only — no CDN</span></td>
+        <td>All responses use <code>Cache-Control: private</code>. Correct given auth context, but CDN edge caching is unavailable. Informational; not a deduction.</td>
+        <td class="col-e">entries[0–4].response.headers: Cache-Control = private</td>
+      </tr>
+      <tr>
+        <td class="col-c">Vary header correct</td>
+        <td><span class="s-good">Correct</span></td>
+        <td><code>Vary: Accept-Encoding, Accept-Language</code> on list endpoint — correct for compressed, locale-aware responses. Prevents cross-locale cache pollution.</td>
+        <td class="col-e">entries[0].response.headers: Vary = Accept-Encoding, Accept-Language</td>
+      </tr>
+      <tr>
+        <td class="col-c">Response includes only needed fields</td>
+        <td><span class="s-good">Yes</span></td>
+        <td>Field filtering in use. Server returns exactly the requested fields plus pagination metadata. No extra top-level bloat observed.</td>
+        <td class="col-e">entries[0].response.content body matches requested fields only</td>
+      </tr>
+      <tr>
+        <td class="col-c">Image / media URLs via CDN</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>No image or media URLs observed in any response bodies.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Pagination cursor stable</td>
+        <td><span class="s-good">Stable</span></td>
+        <td>Cursor <code>cur_eyJpZCI6ImV2dF8wMDIifQ</code> is opaque and base64-encoded. Successfully used in subsequent page request without modification.</td>
+        <td class="col-e">entries[1].request.queryString: cursor=cur_eyJpZCI6ImV2dF8wMDIifQ</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 6 -->
+<div class="section">
+  <h2>6. Offline Sync <span class="pts-badge">(12/12 pts)</span></h2>
+  <div class="panel tip">User confirmed offline access is required. Full delta sync machinery is present and working in this capture.</div>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Sync mechanism</td>
+        <td><span class="s-good">Delta sync</span></td>
+        <td>Timestamp-based delta sync via <code>?updated_since=2026-05-01T00:00:00Z</code>. Response includes <code>sync.as_of</code> — client should use this as the next <code>updated_since</code> value to avoid gaps from concurrent writes. Scores 8/8.</td>
+        <td class="col-e">entries[3].request.queryString: updated_since=2026-05-01T00:00:00Z; entries[3].response.content: sync.as_of = "2026-05-02T10:00:05Z"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Sync key type and parameter name</td>
+        <td><span class="s-good">Timestamp — updated_since</span></td>
+        <td>ISO 8601 UTC. Server returns <code>sync.as_of</code> in response envelope — safe cursor for the next delta window.</td>
+        <td class="col-e">entries[3].response.content: sync.as_of</td>
+      </tr>
+      <tr>
+        <td class="col-c">Deleted record signalling</td>
+        <td><span class="s-good">Tombstones present</span></td>
+        <td><code>include_deleted=true</code> param + <code>deleted_at</code> field in response body. Record <code>evt_099</code> returned with <code>deleted_at: "2026-05-01T14:30:00Z"</code> — client can evict from local store. Scores 2/2.</td>
+        <td class="col-e">entries[3].request.queryString: include_deleted=true; entries[3].response.content: data[1].deleted_at = "2026-05-01T14:30:00Z"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Results safely cacheable on device</td>
+        <td><span class="s-good">Yes</span></td>
+        <td>Stable IDs (<code>evt_001</code>, <code>evt_002</code>), ETag on list responses, <code>updated_at</code> on every record for local store freshness management. Scores 2/2.</td>
+        <td class="col-e">entries[3].response.content: data[0].updated_at = "2026-05-01T12:00:00Z"; ETag confirmed in entries[0,1]</td>
+      </tr>
+      <tr>
+        <td class="col-c">Conflict resolution strategy</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td><code>updated_at</code> timestamps enable last-write-wins on the client, but no explicit server-side conflict policy found in HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Sync tested under large dataset</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot assess from HAR — requires load testing data or spec documentation.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Impact if offline sync missing</td>
+        <td><span class="s-good">Mitigated</span></td>
+        <td>Full delta sync with tombstones is implemented. Field workers can operate with locally cached event data.</td>
+        <td class="col-e">Delta sync, tombstones, and sync.as_of all confirmed</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 7 -->
+<div class="section">
+  <h2>7. Real-time / Change Notifications (RTM) <span class="pts-badge">(0/10 pts)</span></h2>
+  <div class="panel warn">User confirmed auto-updates are required. No real-time transport was found in the capture. This is the single largest gap in this audit — resolving it adds 10 pts and removes a −3 Major deduction.</div>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">RTM transport</td>
+        <td><span class="s-bad">Not found</span></td>
+        <td>No WebSocket, SSE, or push notification endpoint in HAR. No device registration endpoint observed. Mobile app cannot receive server-initiated event changes. Scores 0/6.</td>
+        <td class="col-e">No ws://, wss://, or text/event-stream entries in capture</td>
+      </tr>
+      <tr>
+        <td class="col-c">RTM updates available (event types)</td>
+        <td><span class="s-bad">Not found</span></td>
+        <td>No push events captured. Event schedule changes, cancellations, venue updates, and booking confirmations have no push mechanism.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">RTM data contract matches REST</td>
+        <td><span class="s-unknown">N/A — no RTM</span></td>
+        <td>Cannot assess. Scores 0/4.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Reconnect behaviour documented</td>
+        <td><span class="s-unknown">N/A — no RTM</span></td>
+        <td>Not applicable.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Event ordering guaranteed</td>
+        <td><span class="s-unknown">N/A — no RTM</span></td>
+        <td>Not applicable.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">RTM tested in staging</td>
+        <td><span class="s-unknown">N/A — no RTM</span></td>
+        <td>Not applicable.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 8 -->
+<div class="section">
+  <h2>8. Error Handling &amp; Stability <span class="pts-badge">(14/15 pts)</span></h2>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Consistent error schema</td>
+        <td><span class="s-good">Consistent</span></td>
+        <td>Both 422 and 429 use identical envelope: <code>{"error":{"code":"...","message":"...","details":[]}}</code>. Field-level validation in <code>details[]</code>. Machine-parseable. Scores 5/5.</td>
+        <td class="col-e">entries[6].response: {error:{code,message,retry_after}}; entries[7].response: {error:{code,message,details:[{field,code,message}]}}</td>
+      </tr>
+      <tr>
+        <td class="col-c">Machine-readable error codes</td>
+        <td><span class="s-good">Present</span></td>
+        <td><code>RATE_LIMIT_EXCEEDED</code> on 429, <code>VALIDATION_ERROR</code> on 422 with field-level <code>REQUIRED</code> code. Mobile app can branch on codes without string matching. Scores 3/3.</td>
+        <td class="col-e">entries[6].response.content: error.code = "RATE_LIMIT_EXCEEDED"; entries[7].response.content: error.details[0].code = "REQUIRED"</td>
+      </tr>
+      <tr>
+        <td class="col-c">GET endpoints retry-safe</td>
+        <td><span class="s-good">Safe</span></td>
+        <td>All GET endpoints are read-only. No evidence of state mutation on GET in HAR. Scores 2/2.</td>
+        <td class="col-e">No side-effect evidence in GET entries</td>
+      </tr>
+      <tr>
+        <td class="col-c">Write endpoints idempotent</td>
+        <td><span class="s-good">Yes — Idempotency-Key</span></td>
+        <td><code>Idempotency-Key</code> header on <code>POST /v3/bookings</code>. Retry returns same <code>bkg_abc123</code> with <code>X-Idempotent-Replayed: true</code>. No duplicate booking created. Scores 3/3.</td>
+        <td class="col-e">entries[4].request.headers: Idempotency-Key; entries[5].response.headers: X-Idempotent-Replayed = true</td>
+      </tr>
+      <tr>
+        <td class="col-c">Idempotency-Key header support</td>
+        <td><span class="s-good">Confirmed</span></td>
+        <td>Key echoed in response body as <code>idempotency_key</code>. Both original and retry return <code>201 Created</code> with identical body — safe to retry on network timeout.</td>
+        <td class="col-e">entries[4,5].response.content: idempotency_key = "idem_7f3a9c21-4b8e-4d12-b3e1-9f0c2a8b5d47"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Timeout behaviour documented</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>No timeout documentation visible. No 408 or 504 responses in capture. Cannot confirm from HAR alone.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Circuit breaker / degradation</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot assess from HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">4xx vs 5xx correctly used</td>
+        <td><span class="s-warn">4xx confirmed; 5xx not observed</span></td>
+        <td>422 and 429 are correctly classified. No 5xx in capture — 5xx handling unverifiable from this sample. Scores 1/2.</td>
+        <td class="col-e">entries[6].response.status = 429; entries[7].response.status = 422; no 5xx in entries</td>
+      </tr>
+      <tr>
+        <td class="col-c">Error messages safe for display</td>
+        <td><span class="s-good">Yes</span></td>
+        <td>Messages are user-friendly and non-leaking: <code>"Rate limit exceeded. Retry after 30 seconds."</code>, <code>"staff_id is required"</code>. No stack traces or internal paths.</td>
+        <td class="col-e">entries[6].response.content: error.message = "Rate limit exceeded. Retry after 30 seconds."</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 9 -->
+<div class="section">
+  <h2>9. Rate Limiting &amp; Throttling <span class="pts-badge">(8/8 pts)</span></h2>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Rate limits exist and documented</td>
+        <td><span class="s-good">1,000 req/window</span></td>
+        <td><code>X-RateLimit-Limit: 1000</code> on all responses — limit communicated on every call. Scores 3/3.</td>
+        <td class="col-e">entries[0].response.headers: X-RateLimit-Limit=1000, X-RateLimit-Remaining=987, X-RateLimit-Reset=1746180060</td>
+      </tr>
+      <tr>
+        <td class="col-c">Standard rate limit headers</td>
+        <td><span class="s-good">All three present</span></td>
+        <td><code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, and <code>X-RateLimit-Reset</code> on all successful responses. Client can implement proactive throttling. Scores 3/3.</td>
+        <td class="col-e">entries[0–5].response.headers: all three X-RateLimit-* headers present</td>
+      </tr>
+      <tr>
+        <td class="col-c">429 returned (not silent failure)</td>
+        <td><span class="s-good">Confirmed</span></td>
+        <td>HTTP 429 with <code>RATE_LIMIT_EXCEEDED</code> when limit exhausted. Scores 2/2.</td>
+        <td class="col-e">entries[6].response.status = 429; error.code = "RATE_LIMIT_EXCEEDED"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Retry-After on 429</td>
+        <td><span class="s-good">Present</span></td>
+        <td><code>Retry-After: 30</code> header + <code>retry_after: 30</code> in body. Client can implement precise backoff without guessing.</td>
+        <td class="col-e">entries[6].response.headers: Retry-After = 30; entries[6].response.content: error.retry_after = 30</td>
+      </tr>
+      <tr>
+        <td class="col-c">Burst limit defined</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Sustained window limit observed. Separate burst limit not found in HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Backoff guidance published</td>
+        <td><span class="s-good">Implicit via headers</span></td>
+        <td><code>Retry-After: 30</code> provides explicit guidance. <code>X-RateLimit-Reset</code> epoch enables precise backoff calculation.</td>
+        <td class="col-e">entries[6].response.headers: Retry-After = 30, X-RateLimit-Reset = 1746180090</td>
+      </tr>
+      <tr>
+        <td class="col-c">Limits sufficient for mobile usage</td>
+        <td><span class="s-good">Appears sufficient</span></td>
+        <td>Session of 10 requests decrements remaining from 987 → 984 — ~1.3% of window limit. No evidence of tightness for typical mobile sessions.</td>
+        <td class="col-e">entries[0–5].response.headers: X-RateLimit-Remaining declining 987 → 984</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 10 -->
+<div class="section">
+  <h2>10. Security <span class="pts-badge">(9/10 pts)</span></h2>
+  <div class="panel warn"><strong>Active blocker:</strong> OAuth2 confirmed on iOS/Android consumers but PKCE (<code>code_challenge</code> / <code>code_verifier</code>) not visible in capture. Per RFC 8252, PKCE is mandatory for public mobile clients. Only a refresh_token grant was captured — initial authorization code exchange was not recorded.</div>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Authentication method</td>
+        <td><span class="s-good">OAuth2 JWT Bearer</span></td>
+        <td>RS256-signed JWT Bearer tokens on all API requests. OAuth2 confirmed via token refresh flow. Scores 4/4.</td>
+        <td class="col-e">entries[0].request.headers: Authorization = Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.SAMPLE.SIGNATURE</td>
+      </tr>
+      <tr>
+        <td class="col-c">OAuth flow appropriate for mobile (PKCE)</td>
+        <td><span class="s-warn">Unconfirmed</span></td>
+        <td>Only a <code>refresh_token</code> grant captured. PKCE (<code>code_challenge</code>, <code>code_verifier</code>) not present in capture. For public mobile clients, PKCE is mandatory (RFC 8252 §4.1) to prevent authorization code interception via URI scheme hijacking. Scores 0/1. <strong>Blocker.</strong></td>
+        <td class="col-e">entries[8].request.postData: grant_type=refresh_token, client_id=acme-mobile-ios; no code_challenge or code_verifier</td>
+      </tr>
+      <tr>
+        <td class="col-c">Token refresh documented</td>
+        <td><span class="s-good">Confirmed</span></td>
+        <td>Full refresh flow captured: <code>grant_type=refresh_token</code> → new access + refresh tokens with <code>expires_in: 3600</code>. Token rotation observed. Scores 2/2.</td>
+        <td class="col-e">entries[8].request.postData: grant_type=refresh_token; entries[8].response.content: expires_in=3600, new refresh_token issued</td>
+      </tr>
+      <tr>
+        <td class="col-c">Token expiry / 401 behaviour</td>
+        <td><span class="s-good">1-hour access token</span></td>
+        <td><code>expires_in: 3600</code>. Proactive refresh flow present. No 401 in capture to confirm expired-token handling path, but token rotation is observed.</td>
+        <td class="col-e">entries[8].response.content: expires_in = 3600</td>
+      </tr>
+      <tr>
+        <td class="col-c">Scopes / permissions required</td>
+        <td><span class="s-good">events:read bookings:write</span></td>
+        <td>Two granular scopes. Read and write separated. No wildcard or over-broad scope observed.</td>
+        <td class="col-e">entries[8].response.content: scope = "events:read bookings:write"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Principle of least privilege</td>
+        <td><span class="s-good">Satisfied</span></td>
+        <td>Read/write scopes separated. Client <code>acme-mobile-ios</code> has no admin or management scopes. Scores 1/1.</td>
+        <td class="col-e">entries[8].request.postData: client_id=acme-mobile-ios; scope confirmed minimal</td>
+      </tr>
+      <tr>
+        <td class="col-c">HTTPS enforced</td>
+        <td><span class="s-good">Confirmed — HSTS</span></td>
+        <td><code>Strict-Transport-Security: max-age=31536000; includeSubDomains</code> on API and auth endpoints. All requests use HTTPS. Scores 2/2.</td>
+        <td class="col-e">entries[0].response.headers: Strict-Transport-Security = max-age=31536000; includeSubDomains</td>
+      </tr>
+      <tr>
+        <td class="col-c">PII in response body</td>
+        <td><span class="s-warn">Low risk — review notes field</span></td>
+        <td>Booking notes is a free-text field (<code>"VIP client — priority setup"</code>) that could carry PII depending on usage. Staff IDs and event IDs are opaque references. No email/phone/address in responses.</td>
+        <td class="col-e">entries[4].request.postData: notes = "VIP client — priority setup"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Sensitive data in URL params</td>
+        <td><span class="s-good">None observed</span></td>
+        <td>No tokens, PII, or credentials in query strings. Auth uses POST body (form-encoded).</td>
+        <td class="col-e">All entries[].request.url inspected — no sensitive data in query strings</td>
+      </tr>
+      <tr>
+        <td class="col-c">Mobile-specific risks</td>
+        <td><span class="s-warn">PKCE gap</span></td>
+        <td>Primary risk is unconfirmed PKCE. Without it, authorization codes are vulnerable to interception via custom URI scheme hijacking on iOS/Android (RFC 8252 §8.1). Refresh token rotation mitigates exposure post-issuance.</td>
+        <td class="col-e">entries[8]: refresh_token grant only — initial auth code exchange not captured</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 11 -->
+<div class="section">
+  <h2>11. Localisation &amp; i18n</h2>
+  <div class="panel info">Accept-Language negotiation confirmed end-to-end. Vary header includes Accept-Language. No scoring gap for localisation.</div>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Localisation support</td>
+        <td><span class="s-good">Transport-level</span></td>
+        <td>Client sends <code>Accept-Language: en-US,en;q=0.9</code>. Server returns <code>Vary: Accept-Language</code> — confirms locale-aware response negotiation.</td>
+        <td class="col-e">entries[0].request.headers: Accept-Language = en-US,en;q=0.9; entries[0].response.headers: Vary = Accept-Encoding, Accept-Language</td>
+      </tr>
+      <tr>
+        <td class="col-c">Locale input method</td>
+        <td><span class="s-good">Accept-Language header</span></td>
+        <td>Standard HTTP content negotiation. No locale query param needed.</td>
+        <td class="col-e">entries[0].request.headers: Accept-Language</td>
+      </tr>
+      <tr>
+        <td class="col-c">Locale-aware date formatting</td>
+        <td><span class="s-good">ISO 8601 UTC</span></td>
+        <td>All timestamps use ISO 8601 UTC (<code>"2026-06-01T09:00:00Z"</code>). Client handles locale-specific display formatting.</td>
+        <td class="col-e">entries[0].response.content: start_time = "2026-06-01T09:00:00Z"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Locale-aware currency formatting</td>
+        <td><span class="s-na">N/A</span></td>
+        <td>No currency fields in observed responses.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">RTL text supported</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Only <code>en-US</code> locale observed. RTL handling cannot be confirmed.</td>
+        <td class="col-e">entries[0].request.headers: Accept-Language = en-US only</td>
+      </tr>
+      <tr>
+        <td class="col-c">Supported locales</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Not found in input — requires spec or documentation.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Fallback locale behaviour</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot confirm from HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 12 -->
+<div class="section">
+  <h2>12. Versioning &amp; Deprecation <span class="pts-badge">(3/6 pts)</span></h2>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Versioning strategy</td>
+        <td><span class="s-good">URL path — /v3/</span></td>
+        <td>All API endpoints include <code>/v3/</code> path segment. Clear and predictable. Scores 3/3.</td>
+        <td class="col-e">entries[0].request.url: https://api.acme.com/v3/events</td>
+      </tr>
+      <tr>
+        <td class="col-c">Backward-compatible change policy</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Not found in HAR. Requires spec or documentation.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Deprecation notice period</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Not found in HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Sunset header used</td>
+        <td><span class="s-bad">Not found</span></td>
+        <td>No <code>Sunset</code> or <code>Deprecation</code> header in any response. Mobile clients cannot programmatically detect impending version end-of-life. Scores 0/2.</td>
+        <td class="col-e">No Sunset or Deprecation header in any entries[].response.headers</td>
+      </tr>
+      <tr>
+        <td class="col-c">Old versions still supported</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Only v3 observed. v1/v2 status unknown.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Changelog maintained</td>
+        <td><span class="s-bad">Not found</span></td>
+        <td>Health endpoint returns build <code>3.4.1</code> but no changelog URL in any response. Scores 0/1.</td>
+        <td class="col-e">entries[9].response.content: version = "3.4.1"; no changelog URL in any response headers or bodies</td>
+      </tr>
+      <tr>
+        <td class="col-c">Mobile team notified of changes</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot assess from HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 13 -->
+<div class="section">
+  <h2>13. Testing &amp; Mock Availability <span class="pts-badge">(0/5 pts)</span></h2>
+  <div class="panel note"><strong>HAR-only audit.</strong> No OpenAPI spec provided. All criteria in this dimension default to 0 or unknown. Submitting a spec would recover up to 5 pts and enable sandbox, mock server, and contract test tooling assessment.</div>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">OpenAPI spec current and complete</td>
+        <td><span class="s-unknown">Not provided</span></td>
+        <td>No spec submitted. HAR confirms the API is running and well-behaved but schema documentation cannot be assessed. Scores 0/2.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Sandbox / staging environment</td>
+        <td><span class="s-bad">Not found</span></td>
+        <td>All HAR requests target <code>api.acme.com</code> (production). No staging or sandbox URL observed. Scores 0/2.</td>
+        <td class="col-e">All entries[].request.url host = api.acme.com (production domain)</td>
+      </tr>
+      <tr>
+        <td class="col-c">Mock server available</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot assess without spec.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Representative test data</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>HAR contains realistic sample data (<code>evt_001</code>, <code>bkg_abc123</code>) but cannot confirm a formally maintained test dataset.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Contract tests in CI</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot determine from HAR. Scores 0/1.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Consumer-driven contract tests</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot determine from HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Postman / Bruno collection</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Not found in input.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Known staging limitations</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>No staging environment identified.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 14 -->
+<div class="section">
+  <h2>14. Monitoring &amp; Observability <span class="pts-badge">(3/4 pts)</span></h2>
+  <table>
+    <thead><tr><th class="col-c">Criterion</th><th class="col-s">Status</th><th>Notes</th><th class="col-e">Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-c">Request ID in responses</td>
+        <td><span class="s-good">Confirmed</span></td>
+        <td><code>X-Request-Id</code> (ULID-format: <code>req_01HXYZ001</code>) on all API responses. Also echoed in response body as <code>meta.request_id</code> — enables client-side log correlation. Scores 2/2.</td>
+        <td class="col-e">entries[0].response.headers: X-Request-Id = req_01HXYZ001; entries[0].response.content: meta.request_id = "req_01HXYZ001"</td>
+      </tr>
+      <tr>
+        <td class="col-c">Latency dashboard exists</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Not found in HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Error rate dashboard exists</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Not found in HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Alerting configured</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Cannot assess from HAR.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">SLA / SLO defined</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>Not referenced in any response. Scores 0/1.</td>
+        <td class="col-e">Not found in input</td>
+      </tr>
+      <tr>
+        <td class="col-c">Distributed tracing</td>
+        <td><span class="s-unknown">Unknown</span></td>
+        <td>No <code>X-Trace-Id</code> or W3C <code>traceparent</code> observed. <code>X-Request-Id</code> is a request-scoped ID, not a distributed trace propagation header.</td>
+        <td class="col-e">No X-Trace-Id or traceparent in any entries[].response.headers</td>
+      </tr>
+      <tr>
+        <td class="col-c">Mobile-specific metrics</td>
+        <td><span class="s-good">Platform headers present</span></td>
+        <td>Client sends <code>X-Platform: iOS</code> and <code>X-App-Version: 4.2.1</code> — server can segment latency and error metrics by platform and app version.</td>
+        <td class="col-e">entries[0].request.headers: X-Platform = iOS, X-App-Version = 4.2.1</td>
+      </tr>
+      <tr>
+        <td class="col-c">Health / status endpoint</td>
+        <td><span class="s-good">Confirmed — /v3/health</span></td>
+        <td><code>GET /v3/health</code> returns <code>{"status":"healthy","version":"3.4.1","checks":{"database":"ok","cache":"ok"}}</code> in 22ms. Structured dependency checks present. Scores 1/1.</td>
+        <td class="col-e">entries[9].request.url = https://api.acme.com/v3/health; entries[9].response.content: status = "healthy", checks.database = "ok"</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 15 -->
+<div class="section">
+  <h2>15. Known Issues</h2>
+  <table>
+    <thead><tr><th>Issue</th><th style="width:90px;">Severity</th><th style="width:85px;">Deduction</th><th>Impact / Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>No real-time / push mechanism — user confirmed auto-update is required</td>
+        <td><span class="sev-major">Major</span></td>
+        <td>−3 pts</td>
+        <td>Mobile app cannot receive event schedule changes, cancellations, venue updates, or booking confirmations without the user manually pulling to refresh. Users may act on stale data — attending wrong venue, missing a cancellation.</td>
+      </tr>
+      <tr>
+        <td>OAuth2 PKCE flow not confirmed — initial authorization code exchange not in capture</td>
+        <td><span class="sev-major">Major</span></td>
+        <td>−3 pts</td>
+        <td>Public mobile clients without PKCE are vulnerable to authorization code interception via malicious app URI scheme registration (RFC 8252 §8.1). <strong>Blocker:</strong> hard-caps verdict at "Ready with changes" regardless of numeric score.</td>
+      </tr>
+      <tr>
+        <td>No sandbox or staging environment found — all traffic targets production</td>
+        <td><span class="sev-minor">Minor</span></td>
+        <td>−1 pt</td>
+        <td>Mobile developers and QA cannot run integration tests without creating real bookings in production. Increases risk of data pollution during development cycles.</td>
+      </tr>
+      <tr>
+        <td>No changelog link found in any response or endpoint</td>
+        <td><span class="sev-minor">Minor</span></td>
+        <td>−1 pt</td>
+        <td>Build version <code>3.4.1</code> visible via health endpoint but no history accessible. Mobile teams cannot track breaking vs non-breaking changes between patch releases.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="margin-top:10px; font-size:12px; color:var(--text-sub);">Total deductions: −8 pts (2 major × −3 + 2 minor × −1)</p>
+</div>
+
+<!-- SECTION 16 -->
+<div class="section">
+  <h2>16. Proposed Improvements</h2>
+  <table>
+    <thead><tr><th>Improvement</th><th style="width:80px;">Priority</th><th>Reasoning</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Implement RTM transport (WebSocket, SSE, or APNs/FCM push) for event changes and booking status updates</td>
+        <td><strong style="color:#BF2600">High</strong></td>
+        <td>Resolves the largest scoring gap (0/10 → 10/10) and removes the −3 Major deduction. Mobile users confirmed to need automatic updates. Suggested events: <code>event.updated</code>, <code>event.cancelled</code>, <code>booking.confirmed</code>; fall back to delta-sync polling when offline.</td>
+      </tr>
+      <tr>
+        <td>Confirm and document PKCE (RFC 8252) in the authorization code flow; publish in OpenAPI security scheme</td>
+        <td><strong style="color:#BF2600">High</strong></td>
+        <td>Removes the active blocker and the −3 Major deduction. Prevents authorization code interception on iOS/Android. Required for app store security review compliance on both platforms.</td>
+      </tr>
+      <tr>
+        <td>Provision a sandbox / staging environment with representative seed data</td>
+        <td><strong style="color:#974F0C">Med</strong></td>
+        <td>Mobile developers currently must hit production to test. A sandbox environment enables CI/CD integration tests, partner onboarding, and QA without booking pollution risk. Removes −1 Minor deduction.</td>
+      </tr>
+      <tr>
+        <td>Publish a changelog and link it from the health endpoint or API response headers</td>
+        <td><strong style="color:#974F0C">Med</strong></td>
+        <td>Version <code>3.4.1</code> is visible but history is not. A changelog linked via <code>X-Changelog-Url</code> response header or spec <code>externalDocs</code> lets mobile teams proactively track changes. Removes −1 Minor deduction.</td>
+      </tr>
+      <tr>
+        <td>Add Sunset and Deprecation headers; publish end-of-life policy for v3</td>
+        <td>Low</td>
+        <td>Mobile clients cannot programmatically detect impending version sunset. Adding <code>Sunset</code> headers on responses gives mobile teams machine-readable migration lead time.</td>
+      </tr>
+      <tr>
+        <td>Submit OpenAPI spec for future audits</td>
+        <td>Low</td>
+        <td>Testing &amp; mocks dimension scored 0/5 solely due to spec absence. A current spec unlocks spec-completeness, mock server tooling, contract test validation, and sandbox URL documentation — potential +5 pts.</td>
+      </tr>
+      <tr>
+        <td>Add W3C traceparent or X-Trace-Id to response headers for distributed tracing</td>
+        <td>Low</td>
+        <td>Only per-request X-Request-Id is currently present. Distributed tracing headers would correlate mobile error reports to backend service spans across the stack.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 17 -->
+<div class="section">
+  <h2>17. Final Verdict</h2>
+  <table>
+    <thead><tr><th style="width:28%">Field</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Earned score (raw)</td><td>75 / 100 pts (before deductions)</td></tr>
+      <tr><td>Applicable maximum</td><td>100 pts — no N/A dimensions</td></tr>
+      <tr><td>Deductions</td><td>−8 pts total: Major: RTM missing (−3) + OAuth2 PKCE unconfirmed (−3) · Minor: no sandbox (−1) + no changelog (−1)</td></tr>
+      <tr><td>Adjusted score</td><td><strong style="font-size:18px;">67 / 100</strong> — upper-mid of Ready with changes band (50–74)</td></tr>
+      <tr><td>Verdict</td><td><span class="verdict warn">Ready with changes</span></td></tr>
+      <tr><td>Evidence confidence</td><td><strong>Medium</strong> — HAR only, no spec. 10 entries, all production host. ~22% of scored criteria are unknown. Providing a spec would raise this to High.</td></tr>
+      <tr><td>Score position</td><td>67/100 — upper-mid Ready with changes. Resolving the two Major issues (RTM + PKCE) recovers +10 pts raw + +6 pts deduction reversal → adjusted ~83 (Mobile-ready).</td></tr>
+      <tr><td>Audit coverage</td><td>HAR only · 10 entries · production host api.acme.com</td></tr>
+      <tr><td>Blocker triggered</td><td><strong style="color:#BF2600">Yes — OAuth2 without PKCE on confirmed mobile consumer.</strong> Hard-caps verdict at "Ready with changes" regardless of numeric score. Condition: OAuth2 confirmed + iOS/Android consumers confirmed + PKCE flow not present in capture.</td></tr>
+      <tr>
+        <td>Top 3 risks</td>
+        <td>
+          <strong>1. No RTM transport</strong> — users see stale event data after server-side changes (schedule updates, cancellations, booking confirmations) until they manually pull to refresh.<br><br>
+          <strong>2. PKCE unconfirmed</strong> — authorization code interception risk on mobile; violates RFC 8252 for public clients on iOS and Android.<br><br>
+          <strong>3. No sandbox environment</strong> — mobile developers and QA must test against production, increasing risk of data pollution and incidents during development.
+        </td>
+      </tr>
+      <tr>
+        <td>Engineering recommendation</td>
+        <td>This API is exceptionally well-built for mobile: 100ms p50 latency, cursor pagination with field filtering, full delta sync with tombstones, working ETag/304 caching, idempotent POST with replay confirmation, consistent machine-readable error schema, and comprehensive rate limit signalling — all at full or near-full points. The two issues blocking mobile shipment are (1) confirming PKCE in the authorization code flow (a documentation and config change, not a rewrite) and (2) adding a push/RTM mechanism for server-initiated event changes (new feature work). Resolve both, add a sandbox environment and changelog link, and this API reaches Mobile-ready with high confidence.</td>
+      </tr>
+      <tr>
+        <td>Conditions for approval</td>
+        <td>
+          1. Confirm PKCE (<code>code_challenge</code> + <code>code_verifier</code>) in authorization code flow and document in OpenAPI spec — removes the blocker.<br>
+          2. Implement RTM transport (WebSocket, SSE, or APNs/FCM) covering event-changed and booking-status events.<br>
+          3. Provision a sandbox/staging environment with representative test data.<br>
+          4. Publish a changelog linked from health endpoint or API documentation.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /content -->
+
+<script>
+function selectContent() {
+  const el = document.getElementById('content');
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+</script>
+</body>
+</html>
