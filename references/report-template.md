@@ -9,11 +9,9 @@ Full HTML structure for the generated report. Write this as a single self-contai
 ```
 <head> — styles (inline, no external deps)
 <body>
-  .copy-bar        — "Select all" instruction bar (copy-friendly for any destination)
   .header          — API name, score badge, verdict, meta row
   .score-panel     — dimension bars + deduction summary
   sections 1–17    — evaluation tables
-  <script>         — select-all helper only
 ```
 
 ---
@@ -342,33 +340,6 @@ Table:
 - Top 3 risks
 - Engineering recommendation
 - Conditions for approval (if Ready with changes)
-
----
-
-## Select-all bar
-
-Add this at the top of the page (position: fixed, does not get copied):
-
-```html
-<div class="copy-bar">
-  <span>Open in browser → <strong>Select all</strong> (Cmd/Ctrl+A) → Copy</span>
-  <button onclick="selectContent()">Select all</button>
-</div>
-```
-
-Script:
-```js
-function selectContent() {
-  const el = document.getElementById('content');
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-```
-
-Wrap all report content in `<div id="content">`.
 
 ---
 

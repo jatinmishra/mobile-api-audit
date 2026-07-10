@@ -105,7 +105,6 @@ A single `mobile-readiness-report.html` file that:
 - Shows a score panel with per-dimension bars
 - Has all 17 sections fully filled from your inputs
 - Marks anything not found in inputs as "Not found in input" (never fabricates)
-- Has a **Select all** button — select all, copy, paste into any doc tool (Confluence, Notion, Jira, etc.)
 
 ---
 

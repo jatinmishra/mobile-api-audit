@@ -223,7 +223,6 @@ Then tell the user:
 - The output path
 - The final score and verdict (from Section 18)
 - The top 3 confirmed issues
-- How to copy the report (select all → copy → paste into your doc tool)
 
 Keep this summary to 5–8 lines. The report has the full detail.
 
