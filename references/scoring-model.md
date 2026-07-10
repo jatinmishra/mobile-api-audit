@@ -19,6 +19,33 @@ Example: Offline (14 pts) and RTM (10 pts) confirmed N/A → applicable maximum 
 
 ---
 
+## Dimension ↔ report section map
+
+Scoring dimensions and report sections use different numbers for the same
+concept. This model numbers dimensions by weight; the report
+(`report-template.md`) numbers sections by reading order. Use this table to
+cross-reference — a "Dimension 3" note here maps to "Section 6" in the report.
+
+| Scoring dimension | Max pts | Report section |
+|-------------------|---------|----------------|
+| 1 — Performance & scalability | 17 | Section 4 |
+| 2 — Error handling & stability | 15 | Section 8 |
+| 3 — Offline sync *(conditional)* | 14 | Section 6 |
+| 4 — Caching & payload | 10 | Section 5 |
+| 5 — Real-time / RTM *(conditional)* | 10 | Section 7 |
+| 6 — Security | 10 | Section 10 |
+| 7 — Rate limiting | 8 | Section 9 |
+| 8 — Versioning & deprecation | 5 | Section 13 |
+| 9 — Testing & mocks | 3 | Section 14 |
+| 10 — Observability | 2 | Section 15 |
+| 11 — Conflict handling *(conditional)* | 6 | Section 11 |
+
+Non-scored report sections: 1 (API overview), 2 (data characteristics),
+3 (mobile usage patterns), 12 (localisation), 16 (known issues),
+17 (proposed improvements), 18 (final verdict).
+
+---
+
 ## Dimension 1 — Performance & scalability (17 pts)
 
 | Criterion | Points | Rule |

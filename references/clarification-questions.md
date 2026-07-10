@@ -91,19 +91,26 @@ Only "Genuinely ambiguous" items become questions.
 
 ### Question format
 
-Use a single `AskUserQuestion` tool call for all genuinely ambiguous dimensions. Do not make separate sequential calls — batch all questions into one prompt. State any inferences in a brief text message before the call — do not bundle inferences into the question prompt.
+Use a single `AskUserQuestion` tool call for all genuinely ambiguous dimensions. Do not make separate sequential calls — batch all questions into one call's `questions` array (1–4 entries; 4 is the tool's hard limit). State any inferences in a brief text message before the call — do not bundle inferences into a question.
 
-Prompt structure: list all questions numbered, each with its answer options inline, followed by `options: ["Submit answers above", "Skip all — use defaults"]`. The user replies with free text (e.g. `1. Yes, 2. Manual only`) or selects "Skip all".
+Each entry in the `questions` array is a self-contained card:
+
+- `header` — short label, ≤12 characters (e.g. `"Offline"`, `"Real-time"`)
+- `question` — one or two sentences referencing a specific finding from the input
+- `options` — 2–4 `{ label, description }` objects; `label` is the button text, `description` states the scoring consequence
+- `multiSelect` — `false` unless the dimension genuinely allows multiple answers
+
+Do not add a synthetic "skip all" option. The tool always renders an "Other" free-text field, so the user can always decline or answer in their own words.
 
 ### Response handling
 
-Each `AskUserQuestion` call returns the user's selected option or free-text answer. Handle gracefully:
+Each `AskUserQuestion` call returns the user's selected option(s) or free-text answer per question. Handle gracefully:
 
 | Response | How to handle |
 |----------|---------------|
 | Selected option | Accept and apply to scoring |
-| Free text | Extract intent, map to closest option |
-| "Skip — use default" | Apply default from the table at the bottom of this file; note the applied default |
+| Free text ("Other") | Extract intent, map to closest option |
+| Declined / left blank | Apply default from the table at the bottom of this file; note the applied default |
 
 After all calls complete, confirm interpretation before proceeding:
 
@@ -153,8 +160,9 @@ Don't write paragraph-length questions that require paragraph-length answers.
 
 ---
 
-**Cap at 5 questions.** If you have more than 5 genuinely ambiguous items,
-prioritise by scoring impact (high-point dimensions first).
+**Cap at 4 questions.** This is the tool's hard limit per call. If you have more
+than 4 genuinely ambiguous items, prioritise by scoring impact (high-point
+dimensions first) and apply defaults to the rest.
 
 ---
 
@@ -224,14 +232,48 @@ Given `acme-events-api.yaml` (the example spec):
 First, state inferences in a brief message:
 > "Two inferences I'm applying — correct me if wrong: (1) treating this as an on-screen-load API (GET-heavy, no background triggers), which tightens the latency target to <200ms p50; (2) no PATCH/PUT/DELETE endpoints found, so I'm treating conflict handling as N/A — users can create bookings but not edit existing records offline."
 
-Then make one batched call:
+Then make one batched call — one entry per ambiguous dimension:
 
 ```
 AskUserQuestion(
-  prompt: "I have 4 questions before I can run the audit. Reply with question number + answer (e.g. '1. Yes, 2. Manual only'), or select 'Skip all' to use defaults.\n\n1. Offline access — This API returns staff assignments (/events/{id}/staff) and event schedules — exactly the data field workers need on-site, often with poor connectivity. Do mobile users need this data offline? (Yes, offline needed / No, always online)\n\n2. Real-time updates — The spec has no push, WebSocket, or SSE endpoints. If a schedule changes server-side, does the mobile app need to update automatically? (Auto-update needed / Manual refresh is fine)\n\n3. Booking retries — POST /bookings has no Idempotency-Key. A timeout + retry would create a duplicate booking. How often does the mobile app create bookings? (Manual only / Automated / Both)\n\n4. Localisation — Event names and venue addresses are returned as strings. Will this API serve users in multiple languages or locales? (Yes, multiple locales / No, single language only)",
-  options: [
-    "Submit answers above",
-    "Skip all — use defaults"
+  questions: [
+    {
+      header: "Offline",
+      question: "This API returns staff assignments (/events/{id}/staff) and event schedules — exactly the data field workers need on-site, often with poor connectivity. Do mobile users need this data offline?",
+      options: [
+        { label: "Yes, offline needed", description: "Score the offline-sync dimension normally" },
+        { label: "No, always online",   description: "Mark offline sync N/A" }
+      ],
+      multiSelect: false
+    },
+    {
+      header: "Real-time",
+      question: "The spec has no push, WebSocket, or SSE endpoints. If a schedule changes server-side, does the mobile app need to update automatically?",
+      options: [
+        { label: "Auto-update needed",    description: "Score the RTM dimension normally" },
+        { label: "Manual refresh is fine", description: "Mark RTM N/A" }
+      ],
+      multiSelect: false
+    },
+    {
+      header: "Idempotency",
+      question: "POST /bookings has no Idempotency-Key. A timeout + retry would create a duplicate booking. How often does the mobile app create bookings?",
+      options: [
+        { label: "Manual only", description: "Missing idempotency = medium severity" },
+        { label: "Automated",   description: "Missing idempotency = high severity; blocker applies" },
+        { label: "Both",        description: "Missing idempotency = high severity; blocker applies" }
+      ],
+      multiSelect: false
+    },
+    {
+      header: "Localisation",
+      question: "Event names and venue addresses are returned as strings. Will this API serve users in multiple languages or locales?",
+      options: [
+        { label: "Multiple locales", description: "Score localisation and flag gaps" },
+        { label: "Single language",  description: "Mark localisation N/A" }
+      ],
+      multiSelect: false
+    }
   ]
 )
 ```

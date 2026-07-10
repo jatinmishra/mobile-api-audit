@@ -65,13 +65,10 @@ Context the user may provide via flags or conversation:
 --consumer  Mobile consumer(s), e.g. "iOS app, Android app"
 --domain    Data domain, e.g. "Events", "Bookings"
 --output    Output path (default: ./mobile-readiness-report.html)
---mode      Output verbosity: full (default) or quick (Sections 15–17 only)
+--mode      Output verbosity: full (default) or quick (Sections 16–18 only)
 ```
 
-In `--mode quick`, skip Sections 1–14 and generate only the Known Issues (S15), Proposed Improvements (S16), and Final Verdict (S17) tables. Add a note at the top of the file: *"Quick mode — full report available by re-running without --mode quick."*
-
-```
-```
+In `--mode quick`, skip Sections 1–15 and generate only the Known Issues (S16), Proposed Improvements (S17), and Final Verdict (S18) tables. Add a note at the top of the file: *"Quick mode — full report available by re-running without --mode quick."*
 
 ### Step 2 — Ask clarifying questions via AskUserQuestion
 
@@ -84,38 +81,69 @@ Read `references/clarification-questions.md` for question-building rules before 
 1. **Build a context model** from the inputs — classify each dimension as confirmed / inferrable / genuinely ambiguous
 2. **Skip confirmed dimensions** — no call needed if the signal is present in the spec or HAR
 3. **State inferences** — if you can infer a value confidently, say so in a brief message before the question call: *"I'm treating this as an on-screen-load API based on the GET-heavy pattern — correct me if wrong."*
-4. **Batch all genuinely ambiguous dimensions into a single `AskUserQuestion` call.** List all questions in the prompt field, numbered, each with its answer options. Do not make separate sequential calls.
-5. **Cap at 5 questions** — if more than 5 items are ambiguous, prioritise by scoring weight
+4. **Batch all genuinely ambiguous dimensions into a single `AskUserQuestion` call.** Pass every question in one call's `questions` array — one array entry per dimension. Do not make separate sequential calls.
+5. **Cap at 4 questions per call** — this is the tool's hard limit. If more than 4 items are ambiguous, prioritise by scoring weight and drop the rest to defaults.
 
 #### AskUserQuestion call format
 
-Collect all genuinely ambiguous dimensions and ask them in a single call:
+`AskUserQuestion` takes a `questions` array (1–4 entries). Each entry is a self-contained card with its own selectable options — **not** a single free-text prompt. Each entry has:
+
+- `header` — a short label, ≤12 characters (e.g. `"Offline"`, `"Real-time"`, `"Idempotency"`)
+- `question` — one or two sentences that reference a specific finding from the input
+- `options` — 2–4 objects, each `{ label, description }`. The `label` is the button text; the `description` explains the scoring consequence
+- `multiSelect` — `false` unless the dimension genuinely allows multiple answers
+
+Do not add a synthetic "skip all" option — the tool always renders an "Other" free-text field and the user can decline. Handle a skip/decline by applying defaults from `references/clarification-questions.md`.
+
+**Example call for acme-events-api.yaml** (four genuinely-ambiguous dimensions):
 
 ```
 AskUserQuestion(
-  prompt: "I have [N] questions before I can run the audit. Please answer below — or type 'skip' to use defaults for all.\n\n1. [One sentence of context]. ([Option A] / [Option B] [/ Option C])\n2. [One sentence of context]. ([Option A] / [Option B])\n...",
-  options: [
-    "Submit answers above",
-    "Skip all — use defaults"
+  questions: [
+    {
+      header: "Offline",
+      question: "This API returns staff assignments (/events/{id}/staff) and event schedules — data field workers often need on-site with poor connectivity. Do mobile users need offline access?",
+      options: [
+        { label: "Yes, offline needed", description: "Score the offline-sync dimension normally" },
+        { label: "No, always online",   description: "Mark offline sync N/A — excluded from the denominator" }
+      ],
+      multiSelect: false
+    },
+    {
+      header: "Real-time",
+      question: "The spec has no WebSocket, SSE, or push endpoints. If a schedule changes server-side, does the mobile app need to update automatically?",
+      options: [
+        { label: "Auto-update needed",  description: "Score the RTM dimension normally" },
+        { label: "Manual refresh is fine", description: "Mark RTM N/A — excluded from the denominator" }
+      ],
+      multiSelect: false
+    },
+    {
+      header: "Idempotency",
+      question: "POST /bookings has no Idempotency-Key. A timeout + retry would silently create a duplicate booking. How often does the app create bookings?",
+      options: [
+        { label: "Manual only", description: "Missing idempotency = medium severity" },
+        { label: "Automated",   description: "Missing idempotency = high severity; idempotency blocker applies" },
+        { label: "Both",        description: "Missing idempotency = high severity; idempotency blocker applies" }
+      ],
+      multiSelect: false
+    },
+    {
+      header: "Localisation",
+      question: "Event names, venue addresses, and staff contact details are plain strings. Will this API serve users in multiple languages or locales?",
+      options: [
+        { label: "Multiple locales", description: "Score localisation and flag gaps" },
+        { label: "Single language",  description: "Mark localisation N/A — no deductions" }
+      ],
+      multiSelect: false
+    }
   ]
 )
 ```
 
-**Example call for acme-events-api.yaml:**
+#### If the user skips or declines a question
 
-```
-AskUserQuestion(
-  prompt: "I have 4 questions before I can run the audit. Please answer below — or type 'skip' to use defaults for all.\n\n1. This API returns staff assignments (/events/{id}/staff) and event schedules — data field workers often need on-site with poor connectivity. Do mobile users need offline access? (Yes, offline needed / No, always online)\n\n2. The spec has no WebSocket, SSE, or push endpoints. If a schedule changes server-side, does the mobile app need to update automatically? (Auto-update needed / Manual refresh is fine)\n\n3. POST /bookings has no Idempotency-Key. A timeout + retry would silently create a duplicate booking. How often does the app create bookings? (Manual only / Automated / Both)\n\n4. Event names, venue addresses, and staff contact details are plain strings. Will this API serve users in multiple languages or locales? (Yes, multiple locales / No, single language only)",
-  options: [
-    "Submit answers above",
-    "Skip all — use defaults"
-  ]
-)
-```
-
-#### If the user skips all questions
-
-If the user selects "Skip — use default" on every question, apply all defaults from `references/clarification-questions.md` and proceed to Step 3 without further interaction.
+If the user picks "Other" and declines, leaves a question unanswered, or says "just go" / "skip", apply the default for that dimension from `references/clarification-questions.md` and proceed to Step 3 without further interaction.
 
 #### Applying the answers
 
@@ -176,7 +204,7 @@ Quick reference — signals to extract per input type:
 - `--data` / `-d` — request body shape
 - `-X` — HTTP method
 
-### Step 4 — Score across 10 dimensions
+### Step 4 — Score across 11 dimensions
 
 Read `references/scoring-model.md` for exact scoring rules and point allocations.
 Apply clarification answers first — dimensions marked N/A by the user are excluded from both the earned total and the applicable maximum, and are excluded from the known issues list.
@@ -230,7 +258,7 @@ Keep this summary to 5–8 lines. The report has the full detail.
 
 ## Rules
 
-- **One turn if pre-supplied, two turns otherwise.** If the user's first message includes explicit answers to all clarification dimensions (RTM, offline, locale, usage pattern), skip the question step and proceed in one turn. State the applied context before scoring (e.g. *"Applying: RTM not needed, offline needed, single locale, blocking on launch — running audit now..."*). If any dimension is ambiguous, make one batched `AskUserQuestion` call with all questions (max 5) in a single prompt. After the user replies, run the audit in a final turn.
+- **One turn if pre-supplied, two turns otherwise.** If the user's first message includes explicit answers to all clarification dimensions (RTM, offline, locale, usage pattern), skip the question step and proceed in one turn. State the applied context before scoring (e.g. *"Applying: RTM not needed, offline needed, single locale, blocking on launch — running audit now..."*). If any dimension is ambiguous, make one batched `AskUserQuestion` call with all questions (max 4) as entries in a single `questions` array. After the user replies, run the audit in a final turn.
 - **Ask before scoring when needed.** If any clarification dimension is genuinely ambiguous and not pre-supplied, use the AskUserQuestion step. The answers determine which dimensions are N/A vs scored.
 - **N/A ≠ skip.** When a dimension is N/A, still include its section in the report — mark every row as N/A with a note explaining why.
 - **N/A dimensions are excluded from both numerator and denominator.** A dimension that doesn't apply neither helps nor hurts the score — exclude its points from both the earned total and the applicable maximum. Do not award its points; do not penalise their absence. See scoring-model.md for the adjusted-score formula.
