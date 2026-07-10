@@ -73,7 +73,7 @@ python scripts/run_evals.py --suite trigger
 python scripts/run_evals.py --suite questions
 python scripts/run_evals.py --suite report
 
-# Skip trigger suite (faster, no claude CLI needed)
+# Skip only the trigger suite (still runs questions + report, which need the claude CLI)
 python scripts/run_evals.py --no-trigger
 
 # Verbose output — shows failure evidence
@@ -121,20 +121,20 @@ Exit code 0 if overall ≥80%, exit code 1 otherwise — suitable for CI.
 
 ## CI integration
 
-```yaml
-# .github/workflows/evals.yml
-name: Skill Evals
-on: [push, pull_request]
-jobs:
-  evals:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: python scripts/run_evals.py --no-trigger --suite questions
-      - run: python scripts/run_evals.py --no-trigger --suite report
-```
+A ready-to-use workflow lives at [`.github/workflows/evals.yml`](../.github/workflows/evals.yml).
 
-Note: The trigger suite is excluded from CI because it requires the `claude` CLI.
-Run it locally before publishing changes to `SKILL.md`'s description field.
+**All three suites shell out to the `claude` CLI** (via `_claude_call` in
+`run_evals.py`), so CI must install the CLI and provide an API key:
+
+- Install the CLI in the job: `npm install -g @anthropic-ai/claude-code`
+- Set an `ANTHROPIC_API_KEY` repository secret; the workflow skips itself on
+  forks where the secret is unavailable.
+
+The workflow runs the **questions** and **report** suites. The **trigger** suite
+is excluded from CI — it needs many full-CLI runs per query and is slow/flaky in
+a hosted runner. Run it locally before publishing changes to `SKILL.md`'s
+description field:
+
+```bash
+python scripts/run_evals.py --suite trigger --runs 5
+```

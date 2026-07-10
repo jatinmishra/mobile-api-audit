@@ -65,13 +65,10 @@ Context the user may provide via flags or conversation:
 --consumer  Mobile consumer(s), e.g. "iOS app, Android app"
 --domain    Data domain, e.g. "Events", "Bookings"
 --output    Output path (default: ./mobile-readiness-report.html)
---mode      Output verbosity: full (default) or quick (Sections 15–17 only)
+--mode      Output verbosity: full (default) or quick (Sections 16–18 only)
 ```
 
-In `--mode quick`, skip Sections 1–14 and generate only the Known Issues (S15), Proposed Improvements (S16), and Final Verdict (S17) tables. Add a note at the top of the file: *"Quick mode — full report available by re-running without --mode quick."*
-
-```
-```
+In `--mode quick`, skip Sections 1–15 and generate only the Known Issues (S16), Proposed Improvements (S17), and Final Verdict (S18) tables. Add a note at the top of the file: *"Quick mode — full report available by re-running without --mode quick."*
 
 ### Step 2 — Ask clarifying questions via AskUserQuestion
 
