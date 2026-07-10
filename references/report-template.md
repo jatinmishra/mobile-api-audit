@@ -11,7 +11,7 @@ Full HTML structure for the generated report. Write this as a single self-contai
 <body>
   .header          — API name, score badge, verdict, meta row
   .score-panel     — dimension bars + deduction summary
-  sections 1–17    — evaluation tables
+  sections 1–18    — evaluation tables
 ```
 
 ---

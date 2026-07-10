@@ -207,7 +207,7 @@ Quick reference — signals to extract per input type:
 - `--data` / `-d` — request body shape
 - `-X` — HTTP method
 
-### Step 4 — Score across 10 dimensions
+### Step 4 — Score across 11 dimensions
 
 Read `references/scoring-model.md` for exact scoring rules and point allocations.
 Apply clarification answers first — dimensions marked N/A by the user are excluded from both the earned total and the applicable maximum, and are excluded from the known issues list.

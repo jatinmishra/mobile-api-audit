@@ -2,7 +2,7 @@
 
 A Claude Code skill that analyses API inputs and generates an exhaustive mobile consumption readiness report as a standalone HTML file.
 
-Drop in an OpenAPI spec, HAR traffic capture, or cURL commands — the skill extracts every mobile-relevant signal, scores the API across 10 dimensions, and writes a complete report you can open in any browser.
+Drop in an OpenAPI spec, HAR traffic capture, or cURL commands — the skill extracts every mobile-relevant signal, scores the API across 11 dimensions, and writes a complete report you can open in any browser.
 
 ---
 
@@ -11,18 +11,21 @@ Drop in an OpenAPI spec, HAR traffic capture, or cURL commands — the skill ext
 | # | Section | Max pts |
 |---|---------|---------|
 | 1–3 | API overview, data characteristics, mobile usage patterns | — |
-| 4 | Performance & scalability (pagination, batching, latency, compression) | 20 |
+| 4 | Performance & scalability (pagination, batching, latency, compression) | 17 |
 | 5 | Caching & payload optimisation (Cache-Control, ETag, CDN) | 10 |
-| 6 | Offline sync compatibility (delta sync, tombstones, conflict resolution) | 12 |
+| 6 | Offline sync (delta sync, tombstones, cursor expiry) | 14 |
 | 7 | Real-time / RTM (coverage, contract match, reconnect) | 10 |
-| 8 | Error handling & stability (schema, idempotency, timeout, circuit breaker) | 15 |
-| 9 | Rate limiting & throttling (headers, 429, Retry-After, backoff) | 8 |
-| 10 | Security (auth, token refresh, scopes, HTTPS, PII exposure) | 10 |
-| 11 | Localisation & i18n | — |
-| 12 | Versioning & deprecation (sunset policy, changelog) | 6 |
-| 13 | Testing & mock availability (spec, sandbox, contract tests) | 5 |
-| 14 | Monitoring & observability (dashboards, SLA, tracing) | 4 |
-| 15–17 | Known issues, improvements, final verdict | deductions |
+| 8 | Error handling & stability (schema, recovery fields, idempotency) | 15 |
+| 9 | Rate limiting & throttling (headers, 429, Retry-After) | 8 |
+| 10 | Security (auth, token refresh, PKCE, HTTPS, PII exposure) | 10 |
+| 11 | Conflict handling (policy, response shape, code) — *conditional* | 6 |
+| 12 | Localisation & i18n | — |
+| 13 | Versioning & deprecation (sunset policy, min app version) | 5 |
+| 14 | Testing & mock availability (spec, sandbox) | 3 |
+| 15 | Monitoring & observability (request ID) | 2 |
+| 16–18 | Known issues, improvements, final verdict | deductions |
+
+Total: **100 pts**. Three dimensions — Offline sync, RTM, and Conflict handling — are *conditional*: when confirmed not applicable, they are excluded from both the earned total and the denominator (see `references/scoring-model.md`).
 
 **Verdict bands:** 75–100 Mobile-ready · 50–74 Ready with changes · 0–49 Not mobile-ready
 
@@ -103,7 +106,7 @@ A single `mobile-readiness-report.html` file that:
 
 - Opens in any browser with no server needed
 - Shows a score panel with per-dimension bars
-- Has all 17 sections fully filled from your inputs
+- Has all 18 sections fully filled from your inputs
 - Marks anything not found in inputs as "Not found in input" (never fabricates)
 
 ---
@@ -119,7 +122,8 @@ mobile-api-audit/
 │   ├── clarification-questions.md  ← question bank and defaults for Step 2
 │   ├── extraction-guide.md         ← full signal extraction checklist
 │   ├── scoring-model.md            ← exact point allocations per criterion
-│   └── report-template.md         ← HTML structure and all section definitions
+│   ├── report-template.md          ← HTML structure and all section definitions
+│   └── design-review.md            ← recorded design debate behind the scoring model
 ├── examples/
 │   └── acme-events-api.yaml        ← example OpenAPI spec for testing
 ├── evals/
@@ -137,10 +141,10 @@ mobile-api-audit/
 
 ## Example output
 
-Given `acme-events-api.yaml` (the example spec in this repo):
+Given `acme-events-api.yaml` (the deliberately-flawed example spec in this repo):
 
 ```
-Score:   31 / 100  (raw 39 − 8 for 4 confirmed issues)
+Score:   Not mobile-ready  (low earned score after deductions)
 Verdict: Not mobile-ready
 
 Top issues:
@@ -151,6 +155,10 @@ Top issues:
 
 Report:  ./mobile-readiness-report.html
 ```
+
+> The exact number depends on the clarifying answers (which conditional
+> dimensions apply). See `examples/acme-events-api-report.html` for a full
+> generated report.
 
 ---
 
