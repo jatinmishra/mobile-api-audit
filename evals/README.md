@@ -119,21 +119,42 @@ Exit code 0 if overall ≥80%, exit code 1 otherwise — suitable for CI.
 
 ---
 
-## CI integration
+## CI integration (optional)
 
-A ready-to-use workflow lives at [`.github/workflows/evals.yml`](../.github/workflows/evals.yml).
+By default, evals run **locally** — they are not wired into CI, because
+**all three suites shell out to the `claude` CLI** (via `_claude_call` in
+`run_evals.py`), which needs an Anthropic API key. There is no committed
+workflow, so a fork or clone never fails CI on a missing key.
 
-**All three suites shell out to the `claude` CLI** (via `_claude_call` in
-`run_evals.py`), so CI must install the CLI and provide an API key:
+If you have API access and want evals in GitHub Actions, add the workflow below
+and set an `ANTHROPIC_API_KEY` repository secret
+(Settings → Secrets and variables → Actions):
 
-- Install the CLI in the job: `npm install -g @anthropic-ai/claude-code`
-- Set an `ANTHROPIC_API_KEY` repository secret; the workflow skips itself on
-  forks where the secret is unavailable.
+```yaml
+# .github/workflows/evals.yml
+name: Skill Evals
+on: [push, pull_request]
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    # Skip on forks / PRs where the secret is unavailable.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push' }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: python scripts/run_evals.py --no-trigger --suite questions
+      - run: python scripts/run_evals.py --no-trigger --suite report
+```
 
-The workflow runs the **questions** and **report** suites. The **trigger** suite
-is excluded from CI — it needs many full-CLI runs per query and is slow/flaky in
-a hosted runner. Run it locally before publishing changes to `SKILL.md`'s
-description field:
+The **trigger** suite is left out — it needs many full-CLI runs per query and is
+slow/flaky in a hosted runner. Run it locally before publishing changes to
+`SKILL.md`'s description field:
 
 ```bash
 python scripts/run_evals.py --suite trigger --runs 5
